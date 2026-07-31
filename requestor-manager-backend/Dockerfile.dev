@@ -1,0 +1,22 @@
+# Development Dockerfile for Requestor Manager with hot reload
+FROM maven:3.9-eclipse-temurin-17
+
+WORKDIR /app
+
+# Copy pom.xml first to cache dependencies
+COPY pom.xml .
+
+# Download dependencies (cached unless pom.xml changes)
+RUN mvn dependency:go-offline -B
+
+# Copy source code
+COPY src ./src
+
+# Expose application port and debug port
+EXPOSE 8081 5005
+
+# Run with spring-boot:run for hot reload support
+# DevTools will auto-restart when classes change
+# Debug port 5005 available for remote debugging
+CMD ["mvn", "spring-boot:run", \
+     "-Dspring-boot.run.jvmArguments=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"]

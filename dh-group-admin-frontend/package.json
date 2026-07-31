@@ -1,0 +1,40 @@
+{
+  "name": "dh-group-admin-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "sideEffects": [
+    "*.css",
+    "*.scss"
+  ],
+  "scripts": {
+    "dev": "react-router dev",
+    "build": "react-router build",
+    "start": "cross-env NODE_ENV=production node server.js"
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "^6.5.1",
+    "@react-router/express": "^7.9.3",
+    "@react-router/node": "^7.9.3",
+    "bootstrap": "^5.3.3",
+    "compression": "^1.7.4",
+    "cross-env": "^7.0.3",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "isbot": "^5.1.17",
+    "morgan": "^1.10.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-hot-toast": "^2.4.1",
+    "react-router": "^7.9.3",
+    "sass": "^1.69.5"
+  },
+  "devDependencies": {
+    "@react-router/dev": "^7.9.3",
+    "vite": "^6.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

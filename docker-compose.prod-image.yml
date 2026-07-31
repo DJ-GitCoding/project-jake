@@ -1,0 +1,170 @@
+version: '3.8'
+
+services:
+  # Keycloak - Production-ready OpenID Connect provider
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: keycloak
+    restart: unless-stopped
+    environment:
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      - JADDAR_CLIENT_ID=${JADDAR_CLIENT_ID}
+      - JADDAR_CLIENT_SECRET=${JADDAR_CLIENT_SECRET}
+      - KC_HTTP_ENABLED=true
+      - KC_HOSTNAME_STRICT=false
+      - KC_HOSTNAME_STRICT_HTTPS=false
+      - KC_HOSTNAME_BACKCHANNEL_DYNAMIC=false
+      - KC_HOSTNAME_URL=${KC_HOSTNAME_URL}
+      - KC_HOSTNAME_ADMIN_URL=${KC_HOSTNAME_ADMIN_URL}
+      - KC_PROXY=edge
+      - KC_HTTP_RELATIVE_PATH=/
+    ports:
+      - "127.0.0.1:8080:8080"
+    command: start
+    networks:
+      - app-network
+  
+  # Keycloak Setup - Automatically creates the client
+  keycloak-setup:
+    image: alpine:latest
+    container_name: keycloak-setup
+    restart: "no"
+    depends_on:
+      - keycloak
+    networks:
+      - app-network
+    environment:
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      - JADDAR_CLIENT_ID=${JADDAR_CLIENT_ID}
+      - JADDAR_CLIENT_SECRET=${JADDAR_CLIENT_SECRET}
+      - JADDAR_REDIRECT_URI=${JADDAR_REDIRECT_URI}
+      - JADDAR_WEB_ORIGIN=${JADDAR_WEB_ORIGIN}
+    command: |
+      sh -c '
+      apk add --no-cache curl jq &&
+      echo "Waiting for Keycloak to start..." &&
+      while ! curl -f http://keycloak:8080/realms/master >/dev/null 2>&1; do
+        echo "Waiting for Keycloak..."
+        sleep 5
+      done &&
+      echo "Keycloak is responding, waiting 10 more seconds..." &&
+      sleep 10 &&
+      echo "Getting admin token..." &&
+      TOKEN=$$(curl -s -X POST http://keycloak:8080/realms/master/protocol/openid-connect/token \
+        -H "Content-Type: application/x-www-form-urlencoded" \
+        -d "client_id=admin-cli" \
+        -d "username=$$KEYCLOAK_ADMIN" \
+        -d "password=$$KEYCLOAK_ADMIN_PASSWORD" \
+        -d "grant_type=password" | jq -r .access_token) &&
+      echo "Creating client..." &&
+      curl -s -X POST http://keycloak:8080/admin/realms/master/clients \
+        -H "Authorization: Bearer $$TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "{
+          \"clientId\": \"$$JADDAR_CLIENT_ID\",
+          \"enabled\": true,
+          \"clientAuthenticatorType\": \"client-secret\",
+          \"secret\": \"$$JADDAR_CLIENT_SECRET\",
+          \"redirectUris\": [\"$$JADDAR_REDIRECT_URI\", \"$$JADDAR_WEB_ORIGIN/*\"],
+          \"webOrigins\": [\"$$JADDAR_WEB_ORIGIN\"],
+          \"publicClient\": false,
+          \"protocol\": \"openid-connect\",
+          \"standardFlowEnabled\": true,
+          \"directAccessGrantsEnabled\": true
+        }" &&
+      echo "Client setup complete!"
+      '
+  
+  # Jaddar main backend
+  jaddar-backend:
+    image: jaddar-backend:latest
+    container_name: jaddar-backend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      - JADDAR_KEYCLOAK_AUTH_URL=${JADDAR_KEYCLOAK_AUTH_URL}
+      - JADDAR_CLIENT_ID=${JADDAR_CLIENT_ID}
+      - JADDAR_CLIENT_SECRET=${JADDAR_CLIENT_SECRET}
+      - JADDAR_REDIRECT_URI=${JADDAR_REDIRECT_URI}
+      # Spring datasource (replaces the python DATABASE_URL) — TLS-verified to the CA
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB}?sslmode=verify-ca&sslrootcert=/certs/infra-ca.crt
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - JADDAR_REQUESTOR_AGENT_ID=${JADDAR_REQUESTOR_AGENT_ID}
+      # Mutual TLS — jaddar is client-only; peer URLs above (http) are rewritten onto the peers' mTLS listeners at runtime.
+      - MTLS_ENABLED=${MTLS_ENABLED:-true}
+      - MTLS_KEY_STORE=/certs/jaddar-backend.p12
+      - MTLS_KEY_STORE_PASSWORD=${MTLS_KEYSTORE_PASSWORD:-changeit}
+      - MTLS_TRUST_STORE=/certs/jaddar-truststore.p12
+      - MTLS_TRUST_STORE_PASSWORD=${MTLS_TRUSTSTORE_PASSWORD:-changeit}
+    volumes:
+      # mTLS certs — supply real production certs here (see scripts/generate-mtls-certs.sh for the dev CA)
+      - ./certs:/certs:ro
+    depends_on:
+      keycloak-setup:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_started
+    networks:
+      - app-network
+  
+  # React Frontend
+  jaddar-frontend:
+    image: jaddar-frontend:latest
+    container_name: jaddar-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - REACT_APP_API_URL=${REACT_APP_API_URL}
+      - REACT_APP_AUTH_URL=${REACT_APP_AUTH_URL}
+      - REACT_APP_CLIENT_ID=${JADDAR_CLIENT_ID}
+      - NODE_ENV=production
+    depends_on:
+      - jaddar-backend
+    networks:
+      - app-network
+    stdin_open: true
+    tty: true
+  
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres-db
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      # TLS: stage the CA-signed server cert with correct perms before start
+      - DB_SSL_CERT_NAME=postgres
+      - DB_SSL_OWNER=postgres
+    entrypoint: ["/usr/local/bin/db-ssl-entrypoint.sh"]
+    command:
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/etc/db-certs/server.crt
+      - -c
+      - ssl_key_file=/etc/db-certs/server.key
+      - -c
+      - ssl_ca_file=/etc/db-certs/ca.crt
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./certs:/certs:ro
+      - ./scripts/db-ssl-entrypoint.sh:/usr/local/bin/db-ssl-entrypoint.sh:ro
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge

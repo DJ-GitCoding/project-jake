@@ -1,0 +1,51 @@
+Copyright (C) 2025-2026 Edgemoor Research Institute and Derek Jenkins
+
+This software comprises the Jaddar application, the Requestor Manager, the Data
+Holder, the DH Group Admin, the provisioning and document-scanner sidecars, the
+shared frontend architecture, the mutual-TLS infrastructure, and the associated
+deployment tooling and documentation.
+
+Derek Jenkins <derek@pure-code.net> is the principal author and originator of this
+work, and wrote substantially all of it from the initial commit on 2025-10-06
+onward. Copyright is held jointly by Edgemoor Research Institute and Derek Jenkins.
+
+This program is free software: you can redistribute it and/or modify it under the
+terms of the GNU Affero General Public License, version 3, as published by the
+Free Software Foundation.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License along
+with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+
+ADDITIONAL TERMS UNDER SECTION 7 OF THE GNU AFFERO GENERAL PUBLIC LICENSE
+
+As permitted by Section 7 of the GNU Affero General Public License, version 3,
+this work is conveyed subject to the following additional terms. They apply to
+this work and to every covered work derived from it.
+
+  1. (Section 7(b) — preservation of author attributions.)  You must preserve the
+     author attributions contained in this NOTICE file and in AUTHORS.md, and
+     must reproduce them in the Appropriate Legal Notices displayed by any work
+     containing this material.  Where the work is made available to users over a
+     network, these attributions must remain reachable by those users.
+
+  2. (Section 7(c) — prohibition on misrepresenting origin.)  You may not
+     misrepresent the origin of this material.  Modified versions must be marked
+     in reasonable ways as different from the original version, and must not be
+     presented as originating with any person or organization other than the
+     copyright holders named above.  This includes presenting the work, or any
+     substantial portion of it, as having no identifiable author.
+
+These are additional requirements authorized by Sections 7(b) and 7(c) of the GNU
+Affero General Public License, version 3.  They are not "further restrictions"
+within the meaning of Section 10, and they travel with the work.
+
+Nothing in these additional terms prevents you from being credited for your own
+contributions.  Later contributors may and should be recorded in AUTHORS.md, in
+addition to — never in place of — the principal author.
+
+See AUTHORS.md for the full record of authorship and contributors.

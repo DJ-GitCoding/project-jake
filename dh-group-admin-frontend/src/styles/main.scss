@@ -1,0 +1,364 @@
+/*
+ * SPDX-FileCopyrightText: 2025-2026 Edgemoor Research Institute and Derek Jenkins
+ * SPDX-License-Identifier: AGPL-3.0-only
+ *
+ * Author: Derek Jenkins <derek@pure-code.net>
+ * Additional terms under AGPL-3.0 Section 7 apply. See NOTICE at the repository root.
+ */
+
+// ============================================================================
+// Shared theme — standardized with the main/jaddar frontend.
+// Theme tokens live in _variables.scss; Bootstrap overrides + build in
+// bootstrap-custom.scss. Keep these in sync with the other frontends.
+// ============================================================================
+@import './variables';
+@import './bootstrap-custom';
+
+// Icons (this app uses Font Awesome)
+@import "@fortawesome/fontawesome-free/css/all.min.css";
+
+// ============================================================================
+// Global base + component styling (shared with the jaddar frontend)
+// ============================================================================
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: $font-family-base;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: $bg-secondary;
+  color: $text-primary;
+}
+
+code {
+  font-family: $font-family-monospace;
+}
+
+// App Container
+.App {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex: 1;
+}
+
+// Loading State
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  font-size: $font-size-xl;
+  color: $primary;
+  font-weight: $font-weight-medium;
+
+  &::after {
+    content: '';
+    margin-left: $spacing-md;
+    width: 24px;
+    height: 24px;
+    border: 3px solid $gray-300;
+    border-top-color: $primary;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Buttons
+.btn-primary {
+  background-color: $primary;
+  border-color: $primary;
+  color: $white;
+  font-weight: $font-weight-medium;
+  padding: $spacing-sm $spacing-lg;
+  border-radius: $border-radius;
+  transition: all $transition-base;
+
+  &:hover {
+    background-color: $primary-dark;
+    border-color: $primary-dark;
+    transform: translateY(-1px);
+    box-shadow: $shadow-md;
+  }
+
+  &:active {
+    background-color: $primary-dark;
+    border-color: $primary-dark;
+  }
+
+  &:focus {
+    box-shadow: 0 0 0 0.25rem rgba($primary, 0.25);
+  }
+}
+
+.btn-secondary {
+  background-color: $secondary;
+  border-color: $secondary;
+  color: $white;
+
+  &:hover {
+    background-color: $secondary-dark;
+    border-color: $secondary-dark;
+  }
+}
+
+.btn-outline-primary {
+  color: $primary;
+  border-color: $primary;
+
+  &:hover {
+    background-color: $primary;
+    border-color: $primary;
+    color: $white;
+  }
+}
+
+// Cards
+.card {
+  border: none;
+  border-radius: $border-radius-lg;
+  box-shadow: $shadow;
+  transition: all $transition-base;
+
+  &:hover {
+    box-shadow: $shadow-md;
+  }
+
+  .card-header {
+    background-color: $bg-primary;
+    border-bottom: 2px solid $primary;
+    font-weight: $font-weight-semibold;
+    color: $text-primary;
+    padding: $spacing-lg;
+  }
+
+  .card-body {
+    padding: $spacing-lg;
+  }
+}
+
+// Forms
+.form-control {
+  border-radius: $border-radius;
+  border: 1px solid $border-color;
+  padding: $spacing-sm $spacing-md;
+  transition: all $transition-base;
+
+  &:focus {
+    border-color: $primary;
+    box-shadow: 0 0 0 0.25rem rgba($primary, 0.15);
+  }
+}
+
+.form-label {
+  font-weight: $font-weight-medium;
+  color: $text-primary;
+  margin-bottom: $spacing-sm;
+}
+
+// Alerts
+.alert {
+  border-radius: $border-radius;
+  border: none;
+  border-left: 4px solid;
+
+  &.alert-primary {
+    background-color: rgba($primary, 0.9);
+    border-left-color: $primary;
+    color: $primary-dark;
+  }
+
+  &.alert-success {
+    background-color: rgba($success, 0.9);
+    border-left-color: $success;
+    color: darken($success, 100%);
+  }
+
+  &.alert-danger {
+    background-color: rgba($danger, 0.9);
+    border-left-color: $danger;
+    color: darken($danger, 100%);
+  }
+
+  &.alert-warning {
+    background-color: rgba($warning, 0.9);
+    border-left-color: $warning;
+    color: darken($warning, 100%);
+  }
+
+  &.alert-info {
+    background-color: rgba($info, 0.9);
+    border-left-color: $info;
+    color: darken($info, 100%);
+  }
+}
+
+// Navigation (white header — matches jaddar)
+.navbar {
+  background-color: $white;
+  box-shadow: $shadow;
+  padding: $spacing-md $spacing-lg;
+
+  .navbar-brand {
+    font-weight: $font-weight-bold;
+    color: $primary;
+    font-size: $font-size-xl;
+
+    &:hover {
+      color: $primary-dark;
+    }
+  }
+
+  .nav-link {
+    color: $text-secondary;
+    font-weight: $font-weight-medium;
+    padding: $spacing-sm $spacing-md;
+    transition: color $transition-fast;
+
+    &:hover {
+      color: $primary;
+    }
+
+    &.active {
+      color: $primary;
+    }
+  }
+}
+
+// Tables
+.table {
+  color: $text-primary;
+
+  thead {
+    background-color: $gray-100;
+    color: $text-primary;
+    font-weight: $font-weight-semibold;
+
+    th {
+      border-bottom: 2px solid $primary;
+      padding: $spacing-md;
+    }
+  }
+
+  tbody {
+    tr {
+      transition: background-color $transition-fast;
+
+      &:hover {
+        background-color: $gray-100;
+      }
+    }
+
+    td {
+      padding: $spacing-md;
+      vertical-align: middle;
+    }
+  }
+}
+
+// Badges
+.badge {
+  font-weight: $font-weight-medium;
+  padding: $spacing-xs $spacing-sm;
+  border-radius: $border-radius-sm;
+
+  &.bg-primary {
+    background-color: $primary !important;
+  }
+
+  &.bg-success {
+    background-color: $success !important;
+  }
+
+  &.bg-danger {
+    background-color: $danger !important;
+  }
+
+  &.bg-warning {
+    background-color: $warning !important;
+  }
+
+  &.bg-info {
+    background-color: $info !important;
+  }
+}
+
+// Modal
+.modal-content {
+  border-radius: $border-radius-lg;
+  border: none;
+  box-shadow: $shadow-xl;
+
+  .modal-header {
+    border-bottom: 2px solid $primary;
+    padding: $spacing-lg;
+
+    .modal-title {
+      font-weight: $font-weight-semibold;
+      color: $text-primary;
+    }
+  }
+
+  .modal-body {
+    padding: $spacing-lg;
+  }
+
+  .modal-footer {
+    border-top: 1px solid $border-color;
+    padding: $spacing-lg;
+  }
+}
+
+// Utility Classes
+.text-primary {
+  color: $primary !important;
+}
+
+.text-secondary {
+  color: $secondary !important;
+}
+
+.bg-primary-light {
+  background-color: rgba($primary, 0.1) !important;
+}
+
+.bg-secondary-light {
+  background-color: rgba($secondary, 0.1) !important;
+}
+
+.shadow-custom {
+  box-shadow: $shadow;
+}
+
+.shadow-custom-md {
+  box-shadow: $shadow-md;
+}
+
+.shadow-custom-lg {
+  box-shadow: $shadow-lg;
+}
+
+.rounded-custom {
+  border-radius: $border-radius-lg !important;
+}
+
+.gradient-primary {
+  background: linear-gradient(135deg, $primary 0%, $primary-light 100%);
+}
+
+.gradient-accent {
+  background: linear-gradient(135deg, $accent 0%, $accent-light 100%);
+}

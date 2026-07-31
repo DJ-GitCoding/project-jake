@@ -1,0 +1,35 @@
+/*
+ * SPDX-FileCopyrightText: 2025-2026 Edgemoor Research Institute and Derek Jenkins
+ * SPDX-License-Identifier: AGPL-3.0-only
+ *
+ * Author: Derek Jenkins <derek@pure-code.net>
+ * Additional terms under AGPL-3.0 Section 7 apply. See NOTICE at the repository root.
+ */
+
+// Import our custom variables first
+@import './variables';
+
+// Override Bootstrap variables
+$primary: $primary;
+$secondary: $secondary;
+$success: $success;
+$info: $info;
+$warning: $warning;
+$danger: $danger;
+
+$body-bg: $bg-primary;
+$body-color: $text-primary;
+
+$font-family-sans-serif: $font-family-base;
+$font-family-monospace: $font-family-monospace;
+
+$border-radius: $border-radius;
+$border-radius-sm: $border-radius-sm;
+$border-radius-lg: $border-radius-lg;
+
+$box-shadow: $shadow;
+$box-shadow-sm: $shadow-sm;
+$box-shadow-lg: $shadow-lg;
+
+// Import Bootstrap
+@import 'bootstrap/scss/bootstrap';

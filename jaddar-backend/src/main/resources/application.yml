@@ -1,0 +1,108 @@
+server:
+  port: 8000
+
+# Mutual TLS for outbound calls to backend peers (jaddar receives no service
+# traffic, so it needs no mTLS listener — only client certs). See
+# scripts/generate-mtls-certs.sh. Disabled by default for local dev.
+mtls:
+  enabled: ${MTLS_ENABLED:false}
+  key-store: ${MTLS_KEY_STORE:}
+  key-store-password: ${MTLS_KEY_STORE_PASSWORD:}
+  trust-store: ${MTLS_TRUST_STORE:}
+  trust-store-password: ${MTLS_TRUST_STORE_PASSWORD:}
+  port-map: ${MTLS_PORT_MAP:8081:8481,8082:8482,8083:8483}
+
+spring:
+  application:
+    name: jaddar-server
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/jaddar_db}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      # Schema is owned by Flyway; never let Hibernate mutate it.
+      ddl-auto: none
+    open-in-view: false
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+    validate-on-migrate: false
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Validate Keycloak-issued access tokens against the realm JWKS.
+          # Using jwk-set-uri (not issuer-uri) gives signature + expiry checks
+          # WITHOUT issuer/audience validation — matching the FastAPI behaviour
+          # (verify_iss=False, verify_aud=False) since internal vs public issuer differ.
+          jwk-set-uri: ${JADDAR_JWKS_URL:http://keycloak:8080/realms/master}/protocol/openid-connect/certs
+
+# ============================================================================
+# JADDAR application configuration (mirrors the FastAPI env vars)
+# ============================================================================
+jaddar:
+  keycloak-auth-url: ${JADDAR_KEYCLOAK_AUTH_URL:https://keycloak:8443/realms/master}
+  public-auth-url: ${JADDAR_PUBLIC_AUTH_URL:http://localhost:8080/realms/master}
+  client-id: ${JADDAR_CLIENT_ID:jaddar-app}
+  client-secret: ${JADDAR_CLIENT_SECRET:}
+  redirect-uri: ${JADDAR_REDIRECT_URI:http://localhost:3000/callback}
+  web-origin: ${JADDAR_WEB_ORIGIN:http://localhost:3000}
+  admin-email: ${ADMIN_EMAIL:admin@admin.com}
+  requestor-agent-id: ${JADDAR_REQUESTOR_AGENT_ID:JADDAR-001}
+
+  # Rate limiting (requests per minute, per client IP)
+  rate-limit-rpm: ${RATE_LIMIT_RPM:240}
+
+  # Downstream services
+  requestor-manager-url: ${REQUESTOR_MANAGER_SERVER_URL:http://requestor-manager-backend:8081}
+  dataholder-url: ${DATAHOLDER_URL:http://dataholder:8082}
+  dh-group-admin-url: ${DH_GROUP_ADMIN_URL:http://dh-group-admin-backend:8083}
+
+  # Allowed CORS origins (comma-separated; configure per deployment)
+  cors-allowed-origins: ${JADDAR_CORS_ALLOWED_ORIGINS:http://localhost:3000}
+
+  # Public data holder URL(s) that map to the internal dataholder service
+  # (comma-separated; configure per deployment). Used for backend-to-backend rewrites.
+  dataholder-public-urls: ${DATAHOLDER_PUBLIC_URLS:}
+
+  # Password recovery
+  frontend-url: ${JADDAR_FRONTEND_URL:http://localhost:3000}
+  password-reset:
+    expiry-minutes: ${PASSWORD_RESET_EXPIRY_MINUTES:60}
+
+# SendGrid (Twilio) transactional email
+sendgrid:
+  api-key: ${SENDGRID_API_KEY:}
+  from-email: ${SENDGRID_FROM_EMAIL:}
+  from-name: ${SENDGRID_FROM_NAME:Jaddar}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    com.jaddar: INFO

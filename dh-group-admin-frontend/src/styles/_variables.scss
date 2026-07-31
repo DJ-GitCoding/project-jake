@@ -1,0 +1,116 @@
+/*
+ * SPDX-FileCopyrightText: 2025-2026 Edgemoor Research Institute and Derek Jenkins
+ * SPDX-License-Identifier: AGPL-3.0-only
+ *
+ * Author: Derek Jenkins <derek@pure-code.net>
+ * Additional terms under AGPL-3.0 Section 7 apply. See NOTICE at the repository root.
+ */
+
+// Modern Technical Blue Theme
+// Shared with the main/jaddar frontend to keep styling standardized across apps.
+
+// Primary Colors
+$primary: #0066cc;
+$primary-dark: #004c99;
+$primary-light: #3385d6;
+$primary-lighter: #66a3e0;
+
+// Secondary Colors
+$secondary: #2c3e50;
+$secondary-dark: #1a252f;
+$secondary-light: #34495e;
+
+// Accent Colors
+$accent: #00b4d8;
+$accent-dark: #0096c7;
+$accent-light: #48cae4;
+
+// Neutral Colors
+$white: #ffffff;
+$gray-100: #f8f9fa;
+$gray-200: #e9ecef;
+$gray-300: #dee2e6;
+$gray-400: #ced4da;
+$gray-500: #adb5bd;
+$gray-600: #6c757d;
+$gray-700: #495057;
+$gray-800: #343a40;
+$gray-900: #212529;
+$black: #000000;
+
+// Semantic Colors
+$success: #10b981;
+$info: #3b82f6;
+$warning: #f59e0b;
+$danger: #ef4444;
+
+// Background Colors
+$bg-primary: $white;
+$bg-secondary: $gray-100;
+$bg-dark: $secondary;
+$bg-darker: $secondary-dark;
+
+// Text Colors
+$text-primary: $gray-900;
+$text-secondary: $gray-600;
+$text-muted: $gray-500;
+$text-inverse: $white;
+
+// Border Colors
+$border-color: $gray-300;
+$border-color-dark: $gray-400;
+
+// Shadow
+$shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+$shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+$shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+$shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+$shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+
+// Border Radius
+$border-radius-sm: 0.25rem;
+$border-radius: 0.5rem;
+$border-radius-lg: 0.75rem;
+$border-radius-xl: 1rem;
+
+// Spacing
+$spacing-xs: 0.25rem;
+$spacing-sm: 0.5rem;
+$spacing-md: 1rem;
+$spacing-lg: 1.5rem;
+$spacing-xl: 2rem;
+$spacing-2xl: 3rem;
+$spacing-3xl: 4rem;
+
+// Typography
+$font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+$font-family-monospace: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+
+$font-size-xs: 0.75rem;
+$font-size-sm: 0.875rem;
+$font-size-base: 1rem;
+$font-size-lg: 1.125rem;
+$font-size-xl: 1.25rem;
+$font-size-2xl: 1.5rem;
+$font-size-3xl: 1.875rem;
+$font-size-4xl: 2.25rem;
+
+$font-weight-light: 300;
+$font-weight-normal: 400;
+$font-weight-medium: 500;
+$font-weight-semibold: 600;
+$font-weight-bold: 700;
+
+// Transitions
+$transition-fast: 150ms ease-in-out;
+$transition-base: 250ms ease-in-out;
+$transition-slow: 350ms ease-in-out;
+
+// Z-index
+$z-index-dropdown: 1000;
+$z-index-sticky: 1020;
+$z-index-fixed: 1030;
+$z-index-modal-backdrop: 1040;
+$z-index-modal: 1050;
+$z-index-popover: 1060;
+$z-index-tooltip: 1070;

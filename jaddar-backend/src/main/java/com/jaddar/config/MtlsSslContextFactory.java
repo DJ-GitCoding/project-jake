@@ -1,0 +1,96 @@
+/*
+ * SPDX-FileCopyrightText: 2025-2026 Edgemoor Research Institute and Derek Jenkins
+ * SPDX-License-Identifier: AGPL-3.0-only
+ *
+ * Author: Derek Jenkins <derek@pure-code.net>
+ * Additional terms under AGPL-3.0 Section 7 apply. See NOTICE at the repository root.
+ */
+
+package com.jaddar.config;
+
+import io.netty.handler.ssl.SslContextBuilder;
+
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.KeyStore;
+
+/**
+ * Builds mTLS SSL material from the configured keystore (our identity) and truststore (trusted CA).
+ * Produces both a javax {@link javax.net.ssl.SSLContext} (JDK/Apache clients) and a Netty
+ * {@link io.netty.handler.ssl.SslContext} (reactor-netty WebClient).
+ */
+public final class MtlsSslContextFactory {
+
+    private MtlsSslContextFactory() {}
+
+    public static KeyManagerFactory keyManagerFactory(MtlsProperties p) throws Exception {
+        KeyStore ks = KeyStore.getInstance(p.getKeyStoreType());
+        try (InputStream in = Files.newInputStream(Paths.get(p.getKeyStore()))) {
+            ks.load(in, pw(p.getKeyStorePassword()));
+        }
+        KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        kmf.init(ks, pw(p.getKeyStorePassword()));
+        return kmf;
+    }
+
+    public static TrustManagerFactory trustManagerFactory(MtlsProperties p) throws Exception {
+        KeyStore ts = KeyStore.getInstance(p.getTrustStoreType());
+        try (InputStream in = Files.newInputStream(Paths.get(p.getTrustStore()))) {
+            ts.load(in, pw(p.getTrustStorePassword()));
+        }
+        TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        tmf.init(ts);
+        return tmf;
+    }
+
+    /** javax SSLContext (client + server capable) for JDK/Apache HTTP clients. */
+    public static SSLContext buildJavaxSslContext(MtlsProperties p) throws Exception {
+        SSLContext ctx = SSLContext.getInstance("TLS");
+        ctx.init(keyManagerFactory(p).getKeyManagers(), trustManagerFactory(p).getTrustManagers(), null);
+        return ctx;
+    }
+
+    /** Netty client SslContext (presents our client cert, trusts only the dev CA) for WebClient. */
+    public static io.netty.handler.ssl.SslContext buildNettyClientSslContext(MtlsProperties p) throws Exception {
+        return SslContextBuilder.forClient()
+                .keyManager(keyManagerFactory(p))
+                .trustManager(trustManagerFactory(p))
+                .build();
+    }
+
+    /**
+     * Netty client SslContext presenting our client cert but trusting BOTH the dev CA and the
+     * JVM default CAs, for clients that reach internal peers and public endpoints (RDAP, Keycloak).
+     */
+    public static io.netty.handler.ssl.SslContext buildNettyClientSslContextWithSystemTrust(MtlsProperties p)
+            throws Exception {
+        X509TrustManager ours = firstX509(trustManagerFactory(p));
+        TrustManagerFactory defaultTmf =
+                TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        defaultTmf.init((KeyStore) null); // load the JVM default trust store
+        X509TrustManager jvm = firstX509(defaultTmf);
+        return SslContextBuilder.forClient()
+                .keyManager(keyManagerFactory(p))
+                .trustManager(new CompositeX509TrustManager(ours, jvm))
+                .build();
+    }
+
+    private static X509TrustManager firstX509(TrustManagerFactory tmf) {
+        for (TrustManager tm : tmf.getTrustManagers()) {
+            if (tm instanceof X509TrustManager) {
+                return (X509TrustManager) tm;
+            }
+        }
+        throw new IllegalStateException("No X509TrustManager found");
+    }
+
+    private static char[] pw(String s) {
+        return s == null ? new char[0] : s.toCharArray();
+    }
+}

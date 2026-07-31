@@ -1,0 +1,10 @@
+node_modules
+build
+.git
+.env
+.env.*
+npm-debug.log
+Dockerfile
+Dockerfile.dev
+nginx.conf
+docker-entrypoint*.sh

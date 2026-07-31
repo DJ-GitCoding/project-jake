@@ -1,0 +1,324 @@
+name: Build & Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Detect which services changed so we only rebuild what's needed
+  # ---------------------------------------------------------------------------
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      requestor-manager-backend: ${{ steps.filter.outputs.requestor-manager-backend }}
+      requestor-manager-frontend: ${{ steps.filter.outputs.requestor-manager-frontend }}
+      dataholder-backend: ${{ steps.filter.outputs.dataholder-backend }}
+      dataholder-frontend: ${{ steps.filter.outputs.dataholder-frontend }}
+      dh-group-admin-backend: ${{ steps.filter.outputs.dh-group-admin-backend }}
+      dh-group-admin-frontend: ${{ steps.filter.outputs.dh-group-admin-frontend }}
+      provisioning-sidecar: ${{ steps.filter.outputs.provisioning-sidecar }}
+      compose: ${{ steps.filter.outputs.compose }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'jaddar-backend/**'
+            frontend:
+              - 'jaddar-frontend/**'
+            requestor-manager-backend:
+              - 'requestor-manager-backend/**'
+            requestor-manager-frontend:
+              - 'requestor-manager-frontend/**'
+            dataholder-backend:
+              - 'dataholder-backend/**'
+            dataholder-frontend:
+              - 'dataholder-frontend/**'
+            dh-group-admin-backend:
+              - 'dh-group-admin-backend/**'
+            dh-group-admin-frontend:
+              - 'dh-group-admin-frontend/**'
+            provisioning-sidecar:
+              - 'provisioning-sidecar/**'
+            compose:
+              - 'docker-compose*.yml'
+              - 'nginx-jaddar.conf'
+
+  # ---------------------------------------------------------------------------
+  # 2. Build & push Docker images to GitHub Container Registry
+  # ---------------------------------------------------------------------------
+  build:
+    needs: changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # Make secrets available as env vars for build-args
+      SECRET_REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
+      SECRET_REACT_APP_AUTH_URL: ${{ secrets.REACT_APP_AUTH_URL }}
+      SECRET_CLIENT_ID: ${{ secrets.CLIENT_ID }}
+      SECRET_REACT_APP_KEYCLOAK_ADMIN_URL: ${{ secrets.REACT_APP_KEYCLOAK_ADMIN_URL }}
+      SECRET_REQUESTOR_MANAGER_FRONTEND_API_URL: ${{ secrets.REQUESTOR_MANAGER_FRONTEND_API_URL }}
+      SECRET_DATAHOLDER_FRONTEND_API_URL: ${{ secrets.DATAHOLDER_FRONTEND_API_URL }}
+      SECRET_DH_GROUP_ADMIN_CORS_ORIGINS: ${{ secrets.DH_GROUP_ADMIN_CORS_ORIGINS }}
+      SECRET_DH_GROUP_ADMIN_FRONTEND_API_URL: ${{ secrets.DH_GROUP_ADMIN_FRONTEND_API_URL }}
+      SECRET_PARENT_DOMAIN: ${{ secrets.PARENT_DOMAIN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set lowercase image prefix
+        run: echo "IMAGE_PREFIX=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # --- backend ---
+      - name: Build & push backend
+        if: needs.changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./jaddar-backend
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/jaddar-backend:latest
+            ${{ env.IMAGE_PREFIX }}/jaddar-backend:${{ github.sha }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      # --- frontend ---
+      - name: Build & push frontend
+        if: needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./jaddar-frontend
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/jaddar-frontend:latest
+            ${{ env.IMAGE_PREFIX }}/jaddar-frontend:${{ github.sha }}
+          build-args: |
+            REACT_APP_API_URL=${{ env.SECRET_REACT_APP_API_URL }}
+            REACT_APP_AUTH_URL=${{ env.SECRET_REACT_APP_AUTH_URL }}
+            REACT_APP_CLIENT_ID=${{ env.SECRET_CLIENT_ID }}
+            REACT_APP_KEYCLOAK_ADMIN_URL=${{ env.SECRET_REACT_APP_KEYCLOAK_ADMIN_URL }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+      # --- requestor-manager-backend ---
+      - name: Build & push requestor-manager-backend
+        if: needs.changes.outputs.requestor-manager-backend == 'true' || github.event_name == 'workflow_dispatch'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./requestor-manager-backend
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/requestor-manager-backend:latest
+            ${{ env.IMAGE_PREFIX }}/requestor-manager-backend:${{ github.sha }}
+          cache-from: type=gha,scope=requestor-manager-backend
+          cache-to: type=gha,mode=max,scope=requestor-manager-backend
+
+      # --- requestor-manager-frontend ---
+      - name: Build & push requestor-manager-frontend
+        if: needs.changes.outputs.requestor-manager-frontend == 'true' || github.event_name == 'workflow_dispatch'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./requestor-manager-frontend
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/requestor-manager-frontend:latest
+            ${{ env.IMAGE_PREFIX }}/requestor-manager-frontend:${{ github.sha }}
+          build-args: |
+            REACT_APP_API_URL=${{ env.SECRET_REQUESTOR_MANAGER_FRONTEND_API_URL }}
+            REACT_APP_VERSION=${{ github.sha }}
+          cache-from: type=gha,scope=requestor-manager-frontend
+          cache-to: type=gha,mode=max,scope=requestor-manager-frontend
+
+      # --- dataholder-backend ---
+      - name: Build & push dataholder-backend
+        if: needs.changes.outputs.dataholder-backend == 'true' || github.event_name == 'workflow_dispatch'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./dataholder-backend
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/dataholder-backend:latest
+            ${{ env.IMAGE_PREFIX }}/dataholder-backend:${{ github.sha }}
+          cache-from: type=gha,scope=dataholder-backend
+          cache-to: type=gha,mode=max,scope=dataholder-backend
+
+      # --- dataholder-frontend ---
+      - name: Build & push dataholder-frontend
+        if: needs.changes.outputs.dataholder-frontend == 'true' || github.event_name == 'workflow_dispatch'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./dataholder-frontend
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/dataholder-frontend:latest
+            ${{ env.IMAGE_PREFIX }}/dataholder-frontend:${{ github.sha }}
+          build-args: |
+            REACT_APP_API_URL=${{ env.SECRET_DATAHOLDER_FRONTEND_API_URL }}
+            REACT_APP_REQUESTOR_API_URL=${{ env.SECRET_REACT_APP_API_URL }}
+            REACT_APP_VERSION=${{ github.sha }}
+          cache-from: type=gha,scope=dataholder-frontend
+          cache-to: type=gha,mode=max,scope=dataholder-frontend
+
+      # --- dh-group-admin-backend ---
+      - name: Build & push dh-group-admin-backend
+        if: needs.changes.outputs.dh-group-admin-backend == 'true' || github.event_name == 'workflow_dispatch'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./dh-group-admin-backend
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/dh-group-admin-backend:latest
+            ${{ env.IMAGE_PREFIX }}/dh-group-admin-backend:${{ github.sha }}
+          cache-from: type=gha,scope=dh-group-admin-backend
+          cache-to: type=gha,mode=max,scope=dh-group-admin-backend
+
+      # --- dh-group-admin-frontend ---
+      - name: Build & push dh-group-admin-frontend
+        if: needs.changes.outputs.dh-group-admin-frontend == 'true' || github.event_name == 'workflow_dispatch'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./dh-group-admin-frontend
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/dh-group-admin-frontend:latest
+            ${{ env.IMAGE_PREFIX }}/dh-group-admin-frontend:${{ github.sha }}
+          build-args: |
+            DH_GROUP_ADMIN_CORS_ORIGINS=${{ env.SECRET_DH_GROUP_ADMIN_CORS_ORIGINS }}
+            DH_GROUP_ADMIN_FRONTEND_API_URL=${{ env.SECRET_DH_GROUP_ADMIN_FRONTEND_API_URL }}
+            REACT_APP_PARENT_DOMAIN=${{ env.SECRET_PARENT_DOMAIN }}
+            REACT_APP_VERSION=${{ github.sha }}
+          cache-from: type=gha,scope=dh-group-admin-frontend
+          cache-to: type=gha,mode=max,scope=dh-group-admin-frontend
+
+      # --- provisioning-sidecar ---
+      - name: Build & push provisioning-sidecar
+        if: needs.changes.outputs.provisioning-sidecar == 'true' || github.event_name == 'workflow_dispatch'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./provisioning-sidecar
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/provisioning-sidecar:latest
+            ${{ env.IMAGE_PREFIX }}/provisioning-sidecar:${{ github.sha }}
+          cache-from: type=gha,scope=provisioning-sidecar
+          cache-to: type=gha,mode=max,scope=provisioning-sidecar
+
+  # ---------------------------------------------------------------------------
+  # 3. Deploy to GCP production server
+  # ---------------------------------------------------------------------------
+  deploy:
+    needs: [changes, build]
+    runs-on: ubuntu-latest
+    if: always() && !failure() && !cancelled()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set lowercase image prefix
+        run: echo "IMAGE_PREFIX=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
+
+      - name: Copy docker-compose & nginx config to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: 146.148.96.233
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "docker-compose.prod-deploy.yml"
+          target: /opt/jaddar
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
+          COMMIT_SHA: ${{ github.sha }}
+          CHANGED_BACKEND: ${{ needs.changes.outputs.backend }}
+          CHANGED_FRONTEND: ${{ needs.changes.outputs.frontend }}
+          CHANGED_AGREEMENT_SERVER: ${{ needs.changes.outputs.requestor-manager-backend }}
+          CHANGED_AGREEMENT_FRONTEND: ${{ needs.changes.outputs.requestor-manager-frontend }}
+          CHANGED_TDH_BACKEND: ${{ needs.changes.outputs.dataholder-backend }}
+          CHANGED_TDH_FRONTEND: ${{ needs.changes.outputs.dataholder-frontend }}
+          CHANGED_DH_ADMIN_BACKEND: ${{ needs.changes.outputs.dh-group-admin-backend }}
+          CHANGED_DH_ADMIN_FRONTEND: ${{ needs.changes.outputs.dh-group-admin-frontend }}
+          CHANGED_PROVISIONING: ${{ needs.changes.outputs.provisioning-sidecar }}
+          CHANGED_COMPOSE: ${{ needs.changes.outputs.compose }}
+          IS_MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
+        with:
+          host: 146.148.96.233
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: GITHUB_TOKEN,REGISTRY,IMAGE_PREFIX,COMMIT_SHA,CHANGED_BACKEND,CHANGED_FRONTEND,CHANGED_AGREEMENT_SERVER,CHANGED_AGREEMENT_FRONTEND,CHANGED_TDH_BACKEND,CHANGED_TDH_FRONTEND,CHANGED_DH_ADMIN_BACKEND,CHANGED_DH_ADMIN_FRONTEND,CHANGED_PROVISIONING,CHANGED_COMPOSE,IS_MANUAL
+          script: |
+            set -e
+            cd /opt/jaddar
+
+            # Authenticate with GHCR
+            echo "$GITHUB_TOKEN" | docker login ghcr.io -u github-actions --password-stdin
+
+            # Build list of services to update
+            SERVICES_TO_PULL=""
+
+            pull_if_changed() {
+              local flag="$1"
+              local image="$2"
+              local compose_service="$3"
+              if [ "$flag" = "true" ] || [ "$IS_MANUAL" = "true" ]; then
+                # Pull the exact commit build and (re)tag it locally.
+                echo "Pulling ${IMAGE_PREFIX}/${image}:${COMMIT_SHA}..."
+                docker pull "${IMAGE_PREFIX}/${image}:${COMMIT_SHA}"
+                docker tag "${IMAGE_PREFIX}/${image}:${COMMIT_SHA}" "${image}:latest"
+                SERVICES_TO_PULL="$SERVICES_TO_PULL $compose_service"
+              elif ! docker image inspect "${image}:latest" >/dev/null 2>&1; then
+                echo "Local image ${image}:latest missing — seeding from ${IMAGE_PREFIX}/${image}:latest"
+                docker pull "${IMAGE_PREFIX}/${image}:latest"
+                docker tag "${IMAGE_PREFIX}/${image}:latest" "${image}:latest"
+              fi
+            }
+
+            pull_if_changed "$CHANGED_BACKEND"            "jaddar-backend"                   "jaddar-backend"
+            pull_if_changed "$CHANGED_FRONTEND"           "jaddar-frontend"                  "jaddar-frontend"
+            pull_if_changed "$CHANGED_AGREEMENT_SERVER"   "requestor-manager-backend"    "requestor-manager-backend"
+            pull_if_changed "$CHANGED_AGREEMENT_FRONTEND" "requestor-manager-frontend"  "requestor-manager-frontend"
+            pull_if_changed "$CHANGED_TDH_BACKEND"        "dataholder-backend"        "dataholder-backend"
+            pull_if_changed "$CHANGED_TDH_FRONTEND"       "dataholder-frontend"       "dataholder-frontend"
+            pull_if_changed "$CHANGED_DH_ADMIN_BACKEND"   "dh-group-admin-backend"    "dh-group-admin-backend"
+            pull_if_changed "$CHANGED_DH_ADMIN_FRONTEND"  "dh-group-admin-frontend"   "dh-group-admin-frontend"
+            pull_if_changed "$CHANGED_PROVISIONING"       "provisioning-sidecar"      "provisioning-sidecar"
+
+            # Recreate only changed services (or all if manual dispatch)
+            if [ -n "$SERVICES_TO_PULL" ]; then
+              echo "Recreating services:$SERVICES_TO_PULL"
+              docker compose -p jaddar-deployment -f docker-compose.prod-deploy.yml --env-file .env.production \
+                up -d --no-build --force-recreate $SERVICES_TO_PULL
+            elif [ "$CHANGED_COMPOSE" = "true" ]; then
+              echo "Compose file changed, recreating all services..."
+              docker compose -p jaddar-deployment -f docker-compose.prod-deploy.yml --env-file .env.production \
+                up -d --no-build
+            else
+              echo "No services changed, skipping deploy."
+            fi
+
+            # Cleanup old images
+            docker image prune -f
+
+            echo "Deploy complete! Commit: ${COMMIT_SHA}"

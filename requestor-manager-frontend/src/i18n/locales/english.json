@@ -1,0 +1,692 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "checkingAuth": "Checking authentication...",
+    "user": "User",
+    "logout": "Logout",
+    "close": "Close",
+    "ok": "OK",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving...",
+    "delete": "Delete",
+    "create": "Create",
+    "update": "Update",
+    "edit": "Edit",
+    "viewDetails": "View Details",
+    "clear": "Clear",
+    "na": "N/A",
+    "notSet": "Not set",
+    "unknown": "Unknown",
+    "status": "Status",
+    "name": "Name",
+    "actions": "Actions",
+    "noDescription": "No description provided"
+  },
+  "login": {
+    "missingCredentials": "Please enter both email and password",
+    "unexpectedError": "An unexpected error occurred. Please try again.",
+    "title": "Requestor Manager",
+    "subtitle": "Sign in to manage agreements",
+    "emailLabel": "Email Address",
+    "emailPlaceholder": "Enter your email",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "Enter your password",
+    "signingIn": "Signing in...",
+    "signIn": "Sign In",
+    "forgotPassword": "Forgot password?",
+    "credentialsHint": "Use your Keycloak credentials to sign in"
+  },
+  "forgotPassword": {
+    "title": "Forgot Password",
+    "subtitle": "Reset your account password",
+    "successMessage": "If an account with that email exists, a reset link has been sent.",
+    "backToSignIn": "Back to Sign In",
+    "instructions": "Enter your email address and we'll send you a link to reset your password.",
+    "emailLabel": "Email Address",
+    "emailPlaceholder": "Enter your email",
+    "sending": "Sending...",
+    "sendResetLink": "Send Reset Link"
+  },
+  "resetPassword": {
+    "errors": {
+      "minLength": "Password must be at least 8 characters.",
+      "mismatch": "Passwords do not match.",
+      "resetFailed": "Unable to reset your password. The link may be invalid or expired."
+    },
+    "title": "Reset Password",
+    "subtitle": "Choose a new password",
+    "invalidLink": "This password reset link is invalid or incomplete. Please request a new one.",
+    "requestNewLink": "Request a new link",
+    "successMessage": "Your password has been reset. Redirecting to sign in...",
+    "goToSignIn": "Go to Sign In",
+    "newPasswordLabel": "New Password",
+    "newPasswordPlaceholder": "Enter a new password",
+    "confirmPasswordLabel": "Confirm Password",
+    "confirmPasswordPlaceholder": "Re-enter the new password",
+    "resetting": "Resetting...",
+    "submit": "Reset Password",
+    "backToSignIn": "Back to Sign In"
+  },
+  "notFound": {
+    "title": "Page Not Found",
+    "message": "The page you're looking for doesn't exist or has been moved.",
+    "goToDashboard": "Go to Dashboard"
+  },
+  "unauthorized": {
+    "title": "Access Denied",
+    "message": "You don't have permission to access this page.",
+    "contactAdmin": "Please contact your administrator if you believe this is an error.",
+    "goToDashboard": "Go to Dashboard",
+    "signIn": "Sign In"
+  },
+  "header": {
+    "brand": "Requestor Manager",
+    "toggleNav": "Toggle navigation",
+    "nav": {
+      "dashboard": "Dashboard",
+      "subscriptions": "Subscriptions",
+      "requestorGroups": "Requestor Groups",
+      "dataHolderGroups": "Data Holder Groups",
+      "users": "Users"
+    }
+  },
+  "dashboard": {
+    "loadError": "Failed to load dashboard data",
+    "loading": "Loading dashboard...",
+    "greeting": {
+      "morning": "Good morning",
+      "afternoon": "Good afternoon",
+      "evening": "Good evening"
+    },
+    "greetingLine": "{{greeting}}, {{name}}!",
+    "loggedInAs": "Welcome to the Requestor Manager. You are logged in as",
+    "inGroups": "in groups:",
+    "stats": {
+      "requestorGroups": "Requestor Groups",
+      "users": "Users"
+    },
+    "quickActions": {
+      "title": "Quick Actions",
+      "viewGroups": "View Groups",
+      "manageUsers": "Manage Users"
+    },
+    "permissions": {
+      "title": "Your Permissions",
+      "currentRole": "Current Role",
+      "groupMembership": "Group Membership",
+      "noGroupMembership": "No group membership"
+    },
+    "roleDescriptions": {
+      "jaddarMasterAdmin": "Full system access - Jaddar & Requestor Manager",
+      "groupAdmin": "Can create and manage requestor groups",
+      "requestorGroupAdmin": "Can create users in assigned groups",
+      "requestorGroupUser": "Can view groups and make RDAP requests"
+    }
+  },
+  "pagination": {
+    "items": "items",
+    "noItems": "No {{itemLabel}}",
+    "showing": "Showing {{start}}–{{end}} of {{total}} {{itemLabel}}",
+    "show": "Show",
+    "itemsPerPage": "Items per page",
+    "pagination": "Pagination",
+    "firstPage": "First page",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "lastPage": "Last page"
+  },
+  "multiSelect": {
+    "placeholder": "Select items...",
+    "emptyMessage": "No options available"
+  },
+  "requestorGroups": {
+    "errors": {
+      "loadFailed": "Failed to load requestor groups",
+      "saveFailed": "Failed to save requestor group",
+      "deleteFailed": "Failed to delete requestor group"
+    },
+    "validation": {
+      "codeTooLong": "Code must be 10 characters or less",
+      "codeFormat": "Code must be alphanumeric with hyphens, cannot start/end with hyphen",
+      "codeAlphanumeric": "Code must be alphanumeric",
+      "nameRequired": "Group name is required"
+    },
+    "success": {
+      "updated": "Requestor group updated successfully",
+      "created": "Requestor group created successfully",
+      "deleted": "Requestor group deleted successfully"
+    },
+    "deleteConfirm": {
+      "title": "Delete Requestor Group",
+      "message": "Are you sure you want to delete \"{{name}}\"? This will also affect all associated agreements."
+    },
+    "loading": "Loading requestor groups...",
+    "title": "Requestor Groups",
+    "subtitle": "Manage organizations and groups that can request data access",
+    "newGroup": "New Group",
+    "searchPlaceholder": "Search groups by name, code, or description...",
+    "idLabel": "ID:",
+    "groupBadge": "Group",
+    "createdByLabel": "Created by:",
+    "itemLabel": "groups",
+    "empty": {
+      "title": "No requestor groups found",
+      "filtered": "Try adjusting your search criteria.",
+      "default": "Create your first requestor group to get started.",
+      "createButton": "Create Group"
+    },
+    "editTitle": "Edit Requestor Group",
+    "newTitle": "New Requestor Group",
+    "form": {
+      "name": "Group Name",
+      "namePlaceholder": "Enter group name",
+      "nameHelp": "This name should match a Keycloak group name for user membership.",
+      "code": "Group Code",
+      "codePlaceholder": "e.g., REG-001",
+      "codeHelp": "Short unique identifier (≤10 chars, letters/digits/hyphens). Used in RDAP query parameters.",
+      "codeValid": "Valid",
+      "description": "Description",
+      "descriptionPlaceholder": "Enter group description",
+      "introspectionUrl": "Default Introspection URL",
+      "introspectionUrlPlaceholder": "https://auth.example.com/realms/myrealm/protocol/openid-connect/token/introspect",
+      "introspectionUrlHelp": "The default OAuth 2.0 token introspection endpoint for this group. Auto-filled from the current environment when creating a group — edit it if your introspection endpoint differs. Pre-filled into new subscription requests so data holders can validate bearer tokens."
+    },
+    "detail": {
+      "title": "Group: {{name}}",
+      "name": "Group Name",
+      "code": "Code",
+      "id": "ID",
+      "description": "Description",
+      "introspectionUrl": "Default Introspection URL",
+      "introspectionNotConfigured": "Not configured — will need to be set per subscription",
+      "createdBy": "Created By",
+      "createdAt": "Created At",
+      "activeAgreements": "Active Agreements ({{count}})",
+      "dataHolder": "Data Holder",
+      "accessLevel": "Access Level",
+      "level": "Level {{level}}",
+      "noAgreements": "No active agreements for this group yet.",
+      "subscriptionRequests": "Subscription Requests ({{count}})",
+      "template": "Template",
+      "requested": "Requested",
+      "noSubscriptions": "No subscription requests for this group."
+    }
+  },
+  "users": {
+    "title": "Users",
+    "subtitle": "Manage user accounts and group memberships",
+    "newUser": "New User",
+    "editUser": "Edit User",
+    "searchPlaceholder": "Search users...",
+    "loadingUsers": "Loading users...",
+    "tableTitle": "Users ({{count}})",
+    "itemLabel": "users",
+    "filters": {
+      "allGroups": "All Groups",
+      "allRoles": "All Roles"
+    },
+    "table": {
+      "user": "User",
+      "email": "Email",
+      "groups": "Groups",
+      "role": "Role"
+    },
+    "roles": {
+      "masterAdmin": "Master Admin",
+      "groupAdmin": "Group Admin",
+      "requestorAdmin": "Requestor Admin",
+      "requestorUser": "Requestor User",
+      "defaultUser": "User"
+    },
+    "empty": {
+      "title": "No users found",
+      "filtered": "Try adjusting your search or filter criteria.",
+      "default": "Create your first user to get started.",
+      "createButton": "Create User"
+    },
+    "form": {
+      "email": "Email",
+      "emailPlaceholder": "user@example.com",
+      "firstName": "First Name",
+      "firstNamePlaceholder": "First name",
+      "lastName": "Last Name",
+      "lastNamePlaceholder": "Last name",
+      "password": "Password",
+      "passwordPlaceholder": "Enter password",
+      "groups": "Groups",
+      "groupsPlaceholder": "Select groups...",
+      "groupsEmpty": "No groups available",
+      "role": "Role",
+      "noRoles": "No roles available. You may not have permission to create users."
+    },
+    "validation": {
+      "emailRequired": "Email is required",
+      "passwordRequired": "Password is required for new users"
+    },
+    "success": {
+      "created": "User created successfully",
+      "updated": "User updated successfully",
+      "deleted": "User deleted successfully",
+      "addedToGroup": "User added to group \"{{group}}\" successfully"
+    },
+    "errors": {
+      "loadFailed": "Failed to load users",
+      "saveFailed": "Failed to save user",
+      "deleteFailed": "Failed to delete user",
+      "addToGroupFailed": "Failed to add user to group",
+      "cannotDeleteSelf": "You cannot delete your own account"
+    },
+    "deleteConfirm": {
+      "title": "Delete User",
+      "message": "Are you sure you want to delete \"{{name}}\" ({{email}})? This action cannot be undone."
+    },
+    "addToGroup": {
+      "title": "User Already Exists",
+      "adding": "Adding...",
+      "button": "Add to Group",
+      "existingUser": "Existing User",
+      "nameLabel": "Name:",
+      "emailLabel": "Email:",
+      "currentGroupsLabel": "Current Groups:",
+      "none": "None"
+    }
+  },
+  "dataHolderGroups": {
+    "title": "Data Holder Groups",
+    "subtitle": "Manage registered data holder groups and subscribe to their agreement templates",
+    "addButton": "Add Data Holder Group",
+    "loading": "Loading data holder groups...",
+    "itemLabel": "data holder groups",
+    "errors": {
+      "loadFailed": "Failed to load data holder groups",
+      "requiredFields": "Code, name, and base URL are required",
+      "saveFailed": "Failed to save data holder group",
+      "deleteFailed": "Failed to delete data holder group",
+      "toggleFailed": "Failed to toggle data holder group status",
+      "loadTemplatesFailed": "Failed to load templates from data holder group"
+    },
+    "messages": {
+      "updated": "Data holder group updated successfully",
+      "created": "Data holder group created successfully",
+      "deleted": "Data holder group deleted successfully",
+      "activated": "Data holder group activated",
+      "deactivated": "Data holder group deactivated"
+    },
+    "delete": {
+      "title": "Delete Data Holder Group",
+      "message": "Are you sure you want to delete \"{{name}}\" ({{code}})? This action cannot be undone."
+    },
+    "health": {
+      "healthy": "Healthy",
+      "unhealthy": "Unhealthy",
+      "healthyResult": "{{name}} is healthy",
+      "unhealthyResult": "{{name}} is unhealthy: {{error}}",
+      "unknownError": "Unknown error",
+      "checkFailed": "Health check failed"
+    },
+    "accessLevels": {
+      "public": "Public",
+      "basic": "Basic",
+      "enhanced": "Enhanced",
+      "full": "Full",
+      "badge": "Level {{level}}: {{label}}"
+    },
+    "requestType": {
+      "exigent": "Exigent",
+      "confidential": "Confidential",
+      "standard": "Standard"
+    },
+    "filters": {
+      "searchPlaceholder": "Search data holder groups...",
+      "allStatus": "All Status",
+      "active": "Active",
+      "inactive": "Inactive",
+      "healthy": "Healthy",
+      "unhealthy": "Unhealthy",
+      "refresh": "Refresh"
+    },
+    "card": {
+      "lastContact": "Last contact: {{time}}",
+      "apiKeyConfigured": "API Key configured",
+      "viewTemplates": "View Templates",
+      "templates": "Templates",
+      "checkHealth": "Check Health",
+      "health": "Health",
+      "deactivate": "Deactivate",
+      "activate": "Activate"
+    },
+    "empty": {
+      "title": "No data holder groups found",
+      "filtered": "Try adjusting your search or filter criteria.",
+      "noData": "Add your first data holder group to get started."
+    },
+    "form": {
+      "editTitle": "Edit Data Holder Group",
+      "addTitle": "Add Data Holder Group Group",
+      "code": "Code",
+      "codePlaceholder": "e.g., ARIN",
+      "codeHelp": "Uppercase letters, numbers, underscores, hyphens",
+      "namePlaceholder": "e.g., American Registry for Internet Numbers",
+      "baseUrl": "Base URL",
+      "baseUrlHelp": "The base URL of the data holder group's API (without /api/...)",
+      "description": "Description",
+      "descriptionPlaceholder": "Brief description of the data holder group",
+      "contactEmail": "Contact Email",
+      "notes": "Notes",
+      "notesPlaceholder": "Additional notes or information"
+    },
+    "templates": {
+      "modalTitle": "Templates from {{name}}",
+      "defaultName": "Data Holder Group",
+      "loading": "Loading templates...",
+      "requestTypes": "Request Types:",
+      "manual": "Manual",
+      "id": "ID: {{id}}",
+      "required": "Required: {{types}}",
+      "perDay": "{{count}}/day",
+      "subscribeDisabledTitle": "You must belong to a requestor group to subscribe",
+      "subscribeTitle": "Subscribe to this template",
+      "subscribe": "Subscribe",
+      "terms": "Terms:",
+      "empty": "No templates available from this data holder group",
+      "noGroupsWarning": "You are not a member of any requestor groups. Please contact an administrator to be added to a group before subscribing to templates."
+    },
+    "subscribe": {
+      "modalTitle": "Subscribe to: {{name}}",
+      "defaultTemplateName": "Agreement",
+      "submitting": "Submitting...",
+      "submitRequest": "Submit Request",
+      "saveAsDraft": "Save as Draft",
+      "levelLabel": "(Level {{level}})",
+      "fromLabel": "from {{name}}",
+      "noteLabel": "Note:",
+      "oneSubscriptionNotice": "Only one subscription per requestor group per data holder group is allowed. If your group already has an active or pending subscription with this data holder group, this request will be rejected.",
+      "requestorGroup": "Requestor Group",
+      "selectGroupOption": "Select a requestor group...",
+      "selectGroupHelp": "Select from the requestor groups you belong to",
+      "contactInfo": "Contact Information",
+      "firstName": "First Name",
+      "firstNamePlaceholder": "John",
+      "lastName": "Last Name",
+      "lastNamePlaceholder": "Doe",
+      "organization": "Organization",
+      "organizationPlaceholder": "ACME Corporation",
+      "email": "Email",
+      "phone": "Phone",
+      "phonePlaceholder": "+1 (555) 123-4567",
+      "addressInfo": "Address Information",
+      "streetAddress": "Street Address",
+      "streetAddressPlaceholder": "123 Main Street, Suite 100",
+      "city": "City",
+      "cityPlaceholder": "New York",
+      "stateProvince": "State/Province",
+      "stateProvincePlaceholder": "NY",
+      "postalCode": "Postal Code",
+      "postalCodePlaceholder": "10001",
+      "country": "Country",
+      "countryPlaceholder": "United States",
+      "requestDetails": "Request Details",
+      "reasonForUse": "Reason for Use",
+      "reasonForUsePlaceholder": "Please explain why you need access to this agreement and how you plan to use the data...",
+      "reasonForUseHelp": "Provide a clear explanation of your intended use. This will be reviewed by the data holder group.",
+      "requestedAccessLevel": "Requested Access Level",
+      "accessLevelOptions": {
+        "level0": "Level 0 - Public",
+        "level1": "Level 1 - Basic",
+        "level2": "Level 2 - Enhanced",
+        "level3": "Level 3 - Full"
+      },
+      "accessLevelHelp": "Higher levels require additional justification",
+      "additionalNotes": "Additional Notes",
+      "additionalNotesPlaceholder": "Any additional information or special requests...",
+      "introspectionUrl": "Token Introspection URL",
+      "introspectionUrlHelp": "The OAuth 2.0 token introspection endpoint (RFC 7662) that the data holder will use to validate bearer tokens from your group's members. Leave blank if credentials will be provisioned separately.",
+      "submitImmediately": "Submit immediately to the data holder group",
+      "submitImmediatelyHelp": "Uncheck to save as draft and submit later from the Subscriptions page",
+      "duplicateError": "{{groupName}} already has an existing subscription with {{dataHolderName}}. Only one subscription per data holder group is allowed. Please check the Subscriptions page to view or manage your existing subscription.",
+      "yourGroup": "Your group",
+      "submittedSuccess": "Subscription request submitted successfully! You can track its status in the Subscriptions page.",
+      "draftCreated": "Subscription request created as draft. Go to Subscriptions to review and submit.",
+      "createFailed": "Failed to create subscription request",
+      "validation": {
+        "selectGroup": "Please select a requestor group",
+        "firstNameRequired": "Requestor first name is required",
+        "lastNameRequired": "Requestor last name is required",
+        "emailRequired": "Contact email is required",
+        "reasonRequired": "Reason for use is required"
+      }
+    }
+  },
+  "subscriptions": {
+    "title": "Subscriptions",
+    "subtitle": "Manage your agreement subscription requests and active agreements",
+    "loadingSubscriptions": "Loading subscriptions...",
+    "level": "Level {{level}}",
+    "summary": {
+      "totalRequests": "Total Requests",
+      "pending": "Pending",
+      "actionRequired": "Action Required",
+      "activeAgreements": "Active Agreements"
+    },
+    "alert": {
+      "actionRequiredLabel": "Action Required:",
+      "actionRequiredText": "You have {{count}} subscription(s) that need your attention.",
+      "readyForTesting": "{{count}} ready for testing",
+      "inTesting": "{{count}} in testing"
+    },
+    "tabs": {
+      "requests": "Subscription Requests",
+      "agreements": "Active Agreements"
+    },
+    "filters": {
+      "searchPlaceholder": "Search...",
+      "allStatuses": "All Statuses",
+      "approvedOption": "Approved (Ready for Testing)",
+      "allGroups": "All Groups",
+      "refresh": "Refresh"
+    },
+    "status": {
+      "draft": "Draft",
+      "submitted": "Submitted",
+      "pendingReview": "Pending Review",
+      "approved": "Approved - Ready for Testing",
+      "testing": "Testing",
+      "active": "Active",
+      "declined": "Declined",
+      "suspended": "Suspended",
+      "cancelled": "Cancelled",
+      "expired": "Expired"
+    },
+    "accessLevel": {
+      "public": "Public",
+      "basic": "Basic",
+      "enhanced": "Enhanced",
+      "full": "Full"
+    },
+    "requestType": {
+      "exigent": "Exigent",
+      "confidential": "Confidential",
+      "standard": "Standard"
+    },
+    "table": {
+      "requestId": "Request ID",
+      "template": "Template",
+      "dataHolderGroup": "Data Holder Group",
+      "requestorGroup": "Requestor Group",
+      "requestedBy": "Requested By",
+      "created": "Created"
+    },
+    "hints": {
+      "awaitingReview": "Awaiting review...",
+      "underReview": "Under review...",
+      "readyForTesting": "Ready for testing",
+      "testsPassedReady": "Tests passed — ready to activate",
+      "runTestsToProceed": "Run tests to proceed",
+      "autoTestingQueued": "Testing starts automatically…",
+      "autoTestingInProgress": "Automated testing in progress…",
+      "autoActivating": "Tests passed — activating…",
+      "autoHalted": "Testing did not pass — manual review needed"
+    },
+    "actions": {
+      "submit": "Submit",
+      "refreshStatus": "Refresh Status",
+      "startTesting": "Start Testing",
+      "runTests": "Run Tests",
+      "activate": "Activate",
+      "automatedInProgress": "Automated testing & activation in progress"
+    },
+    "polling": {
+      "autoChecking": "Auto-checking {{count}} in-flight request{{plural}} every 5 seconds",
+      "lastChecked": "Last checked: {{time}}"
+    },
+    "empty": {
+      "requestsTitle": "No subscription requests found",
+      "adjustCriteria": "Try adjusting your search or filter criteria.",
+      "requestsHint": "Subscribe to a data holder template to create your first request.",
+      "agreementsTitle": "No active agreements found",
+      "agreementsHint": "Active agreements will appear here once your subscriptions are activated."
+    },
+    "fields": {
+      "requestorGroup": "Requestor Group:",
+      "requestTypes": "Request Types:",
+      "accessLevel": "Access Level:",
+      "activated": "Activated:",
+      "effectiveFrom": "Effective From:",
+      "expires": "Expires:",
+      "queriesPerDay": "{{count}} queries/day"
+    },
+    "pagination": {
+      "requests": "requests"
+    },
+    "confirm": {
+      "submit": {
+        "title": "Submit Subscription Request",
+        "body": "Are you sure you want to submit \"{{name}}\" subscription request to {{group}}?"
+      },
+      "cancel": {
+        "title": "Cancel Subscription Request",
+        "body": "Are you sure you want to cancel the subscription request for \"{{name}}\"? This action cannot be undone.",
+        "confirmText": "Cancel Request"
+      },
+      "startTesting": {
+        "title": "Start Testing",
+        "body": "Are you sure you want to start the testing phase for \"{{name}}\"? This will transition the subscription to TESTING status."
+      },
+      "activate": {
+        "title": "Activate Subscription",
+        "body": "Are you sure you want to activate the subscription for \"{{name}}\"? This will finalize the agreement and grant access."
+      }
+    },
+    "toasts": {
+      "statusRefreshed": "Status refreshed",
+      "submitted": "Subscription request submitted successfully",
+      "cancelled": "Subscription request cancelled",
+      "testingStarted": "Testing started successfully",
+      "testsPassed": "All tests passed! You can now activate the subscription.",
+      "testsFailed": "Some tests failed. Please review the results.",
+      "activated": "Subscription activated successfully! The agreement is now active.",
+      "approved": "\"{{name}}\" has been approved and is ready for testing!",
+      "declined": "\"{{name}}\" has been declined: {{reason}}",
+      "noReason": "No reason provided",
+      "active": "\"{{name}}\" is now active!",
+      "testing": "\"{{name}}\" is now in testing phase."
+    },
+    "errors": {
+      "loadFailed": "Failed to load subscriptions",
+      "refreshFailed": "Failed to refresh status",
+      "submitFailed": "Failed to submit subscription request",
+      "cancelFailed": "Failed to cancel subscription request",
+      "startTestingFailed": "Failed to start testing",
+      "runTestFailed": "Failed to run tests",
+      "activateFailed": "Failed to activate subscription"
+    },
+    "testSummary": {
+      "validationTests": "Validation Tests",
+      "passed": "{{count}} passed",
+      "failed": "{{count}} failed",
+      "rdapTests": "RDAP Tests",
+      "skipped": "{{count}} skipped",
+      "error": "{{count}} error",
+      "duration": "Duration",
+      "ms": "{{count}}ms"
+    },
+    "category": {
+      "lookup": "Lookup",
+      "access": "Access",
+      "contactVisibility": "Contact Visibility",
+      "redaction": "Redaction",
+      "parameter": "Parameters"
+    },
+    "result": {
+      "passed": "PASSED",
+      "failed": "FAILED",
+      "skipped": "SKIPPED",
+      "error": "ERROR"
+    },
+    "rdap": {
+      "expected": "Expected:",
+      "actual": "Actual:",
+      "lookupLabel": "{{queryType}} lookup: {{queryValue}}",
+      "checksCount": "{{passed}}/{{total}} checks"
+    },
+    "modal": {
+      "agreementDetails": "Agreement Details",
+      "requestDetails": "Subscription Request Details",
+      "updated": "Updated: {{time}}",
+      "runTestsHint": "Run tests and wait for them to pass before activating",
+      "requestInformation": "Request Information",
+      "requestId": "Request ID",
+      "externalId": "External ID",
+      "template": "Template",
+      "dataHolderGroup": "Data Holder Group",
+      "requestorGroup": "Requestor Group",
+      "accessLevel": "Access Level",
+      "created": "Created",
+      "submitted": "Submitted",
+      "expires": "Expires",
+      "contactInformation": "Contact Information",
+      "fullName": "Full Name",
+      "organization": "Organization",
+      "email": "Email",
+      "phone": "Phone",
+      "reasonForUse": "Reason for Use",
+      "additionalNotes": "Additional Notes",
+      "agreementInformation": "Agreement Information",
+      "agreementId": "Agreement ID",
+      "name": "Name",
+      "status": "Status",
+      "validityLimits": "Validity & Limits",
+      "effectiveFrom": "Effective From",
+      "effectiveTo": "Effective To",
+      "dailyLimit": "Daily Limit",
+      "monthlyLimit": "Monthly Limit",
+      "queries": "{{count}} queries",
+      "lastVerified": "Last Verified",
+      "description": "Description",
+      "termsAndConditions": "Terms and Conditions",
+      "dataUsagePolicy": "Data Usage Policy"
+    },
+    "testModal": {
+      "title": "Test Results",
+      "activateSubscription": "Activate Subscription",
+      "allTestsPassed": "All Tests Passed!",
+      "someTestsFailed": "Some Tests Failed",
+      "requestId": "Request ID:",
+      "testedAt": "Tested At:",
+      "validationTests": "Validation Tests",
+      "error": "Error:",
+      "passed": "PASSED",
+      "failed": "FAILED",
+      "rdapDataTests": "RDAP Data Tests",
+      "entities": "{{count}} entities",
+      "passedMessage": "All tests passed! You can now activate this subscription to finalize the agreement.",
+      "failedMessage": "Some tests failed. Please review the errors above and contact the data holder if needed."
+    }
+  },
+  "footer": {
+    "codeBy": "Code By:",
+    "copyright": "© {{year}} Edgemoor Research Institute and Derek Jenkins. Licensed under AGPL-3.0.",
+    "sourceCode": "Source code"
+  }
+}

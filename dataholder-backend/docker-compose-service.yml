@@ -1,0 +1,35 @@
+# Add this service to your existing docker-compose.yml
+
+  dataholder:
+    build:
+      context: ./dataholder-backend
+      dockerfile: Dockerfile
+    container_name: dataholder
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/dataholder_db
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - KEYCLOAK_INTROSPECT_URL=http://keycloak:8080/realms/master/protocol/openid-connect/token/introspect
+      - KEYCLOAK_CLIENT_ID=jaddar-app
+      - KEYCLOAK_CLIENT_SECRET=${JADDAR_CLIENT_SECRET:?JADDAR_CLIENT_SECRET must be set}
+      - DATAHOLDER_JWT_SECRET=${DATAHOLDER_JWT_SECRET:?DATAHOLDER_JWT_SECRET must be set}
+      - DATAHOLDER_NAME=Test Data Holder
+      - DATAHOLDER_ID=TDH-001
+      - DEFAULT_ACCESS_LEVEL=1
+      - REQUIRE_AGREEMENT=true
+      - MANUAL_VERIFICATION_ENABLED=false
+      - MANUAL_VERIFICATION_LEVEL=3
+      - ADMIN_USERNAME=${DATAHOLDER_ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${DATAHOLDER_ADMIN_PASSWORD:?DATAHOLDER_ADMIN_PASSWORD must be set}
+    depends_on:
+      - postgres
+      - keycloak
+    networks:
+      - jaddar-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

@@ -1,0 +1,21 @@
+# Development Dockerfile for Test Data Holder Backend with hot reload
+FROM maven:3.9-eclipse-temurin-17
+
+WORKDIR /app
+
+# Copy POM and resolve dependencies first (Docker layer cache)
+COPY pom.xml ./pom.xml
+RUN mvn dependency:go-offline -B -q || true
+
+# Copy source code
+COPY src ./src
+
+# Build once so spring-boot plugin is resolved
+RUN mvn compile -B -q || true
+
+# Expose application port and debug port
+EXPOSE 8082 5007
+
+# Run with spring-boot:run for hot reload support
+CMD ["mvn", "spring-boot:run", \
+     "-Dspring-boot.run.jvmArguments=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5007"]

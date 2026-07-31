@@ -1,0 +1,771 @@
+version: '3.8'
+
+services:
+  # Keycloak - Production-ready OpenID Connect provider
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: keycloak
+    restart: unless-stopped
+    environment:
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      - JADDAR_CLIENT_ID=${JADDAR_CLIENT_ID}
+      - JADDAR_CLIENT_SECRET=${JADDAR_CLIENT_SECRET}
+      - KC_HTTP_ENABLED=true
+      - KC_HTTPS_CERTIFICATE_FILE=/certs/keycloak.crt
+      - KC_HTTPS_CERTIFICATE_KEY_FILE=/certs/keycloak.key
+      - KC_HOSTNAME=${KC_HOSTNAME_URL}
+      - KC_HOSTNAME_STRICT=false
+      - KC_HOSTNAME_BACKCHANNEL_DYNAMIC=false
+      - KC_PROXY_HEADERS=xforwarded
+      - KC_HTTP_RELATIVE_PATH=/
+      # Database configuration for persistence
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://postgres:5432/keycloak_db?sslmode=verify-ca&sslrootcert=/certs/infra-ca.crt
+      - KC_DB_USERNAME=${POSTGRES_USER}
+      - KC_DB_PASSWORD=${POSTGRES_PASSWORD}
+      # Logging configuration
+      - KC_LOG_LEVEL=INFO,org.keycloak.events:DEBUG
+      - KC_LOG_CONSOLE_OUTPUT=json
+      - QUARKUS_LOG_CATEGORY__ORG_KEYCLOAK_EVENTS__LEVEL=DEBUG
+      - QUARKUS_LOG_CATEGORY__ORG_KEYCLOAK_PROTOCOL_OIDC__LEVEL=DEBUG
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      postgres-setup:
+        condition: service_completed_successfully
+    command: start
+    volumes:
+      - ./certs:/certs:ro
+    networks:
+      - app-network
+
+  # Keycloak Setup - Creates client, events, group mapper, and Jaddar roles
+  keycloak-setup:
+    image: alpine:latest
+    container_name: keycloak-setup
+    restart: "no"
+    depends_on:
+      - keycloak
+    networks:
+      - app-network
+    environment:
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      - JADDAR_CLIENT_ID=${JADDAR_CLIENT_ID}
+      - JADDAR_CLIENT_SECRET=${JADDAR_CLIENT_SECRET}
+      - JADDAR_REDIRECT_URI=${JADDAR_REDIRECT_URI}
+      - JADDAR_WEB_ORIGIN=${JADDAR_WEB_ORIGIN}
+    command: |
+      sh -c '
+      apk add --no-cache curl jq &&
+      echo "Waiting for Keycloak to start..." &&
+      while ! curl -f http://keycloak:8080/realms/master >/dev/null 2>&1; do
+        echo "Waiting for Keycloak..."
+        sleep 5
+      done &&
+      echo "Keycloak is responding, waiting 10 more seconds..." &&
+      sleep 10 &&
+      echo "Getting admin token..." &&
+      TOKEN=$$(curl -s -X POST http://keycloak:8080/realms/master/protocol/openid-connect/token \
+        -H "Content-Type: application/x-www-form-urlencoded" \
+        -d "client_id=admin-cli" \
+        -d "username=$$KEYCLOAK_ADMIN" \
+        -d "password=$$KEYCLOAK_ADMIN_PASSWORD" \
+        -d "grant_type=password" | jq -r .access_token) &&
+
+      echo "===== CONFIGURING SESSION TIMEOUTS =====" &&
+      REALM_CONFIG=$$(curl -s -X GET "http://keycloak:8080/admin/realms/master" \
+        -H "Authorization: Bearer $$TOKEN" \
+        -H "Content-Type: application/json") &&
+      
+      CURRENT_SSO_IDLE=$$(echo "$$REALM_CONFIG" | jq -r ".ssoSessionIdleTimeout") &&
+      echo "Current SSO Session Idle Timeout: $$CURRENT_SSO_IDLE seconds" &&
+      
+      if [ "$$CURRENT_SSO_IDLE" != "1800" ]; then
+        echo "Updating session timeouts to 30 minutes..." &&
+        curl -s -X PUT "http://keycloak:8080/admin/realms/master" \
+          -H "Authorization: Bearer $$TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "{
+            \"ssoSessionIdleTimeout\": 1800,
+            \"ssoSessionMaxLifespan\": 36000,
+            \"accessTokenLifespan\": 1800,
+            \"accessTokenLifespanForImplicitFlow\": 1800,
+            \"offlineSessionIdleTimeout\": 2592000,
+            \"offlineSessionMaxLifespan\": 5184000
+          }" &&
+        echo "Session timeouts updated successfully!"
+      else
+        echo "Session timeouts already configured to 30 minutes, skipping."
+      fi &&
+      
+      echo "===== ENABLING KEYCLOAK EVENTS =====" &&
+      curl -s -X PUT "http://keycloak:8080/admin/realms/master/events/config" \
+        -H "Authorization: Bearer $$TOKEN" \
+        -H "Content-Type: application/json" \
+        -d "{
+          \"eventsEnabled\": true,
+          \"eventsExpiration\": 604800,
+          \"eventsListeners\": [\"jboss-logging\", \"events-store\"],
+          \"enabledEventTypes\": [
+            \"LOGIN\", \"LOGIN_ERROR\", \"LOGOUT\", \"LOGOUT_ERROR\",
+            \"CODE_TO_TOKEN\", \"CODE_TO_TOKEN_ERROR\",
+            \"REFRESH_TOKEN\", \"REFRESH_TOKEN_ERROR\",
+            \"INTROSPECT_TOKEN\", \"INTROSPECT_TOKEN_ERROR\",
+            \"TOKEN_EXCHANGE\", \"TOKEN_EXCHANGE_ERROR\",
+            \"CLIENT_LOGIN\", \"CLIENT_LOGIN_ERROR\",
+            \"REGISTER\", \"REGISTER_ERROR\",
+            \"UPDATE_PASSWORD\", \"UPDATE_PROFILE\",
+            \"VERIFY_EMAIL\", \"FEDERATED_IDENTITY_LINK\",
+            \"IDENTITY_PROVIDER_LOGIN\", \"IMPERSONATE\",
+            \"PERMISSION_TOKEN\", \"PERMISSION_TOKEN_ERROR\"
+          ],
+          \"adminEventsEnabled\": true,
+          \"adminEventsDetailsEnabled\": true
+        }" &&
+      echo "Events enabled successfully!" &&
+      
+      echo "===== SETTING UP CLIENT =====" &&
+      EXISTING_CLIENT=$$(curl -s -X GET "http://keycloak:8080/admin/realms/master/clients?clientId=$$JADDAR_CLIENT_ID" \
+        -H "Authorization: Bearer $$TOKEN" \
+        -H "Content-Type: application/json") &&
+      if [ "$$EXISTING_CLIENT" = "[]" ]; then
+        echo "Creating new client..." &&
+        curl -s -X POST http://keycloak:8080/admin/realms/master/clients \
+          -H "Authorization: Bearer $$TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "{
+            \"clientId\": \"$$JADDAR_CLIENT_ID\",
+            \"enabled\": true,
+            \"clientAuthenticatorType\": \"client-secret\",
+            \"secret\": \"$$JADDAR_CLIENT_SECRET\",
+            \"redirectUris\": [\"$$JADDAR_REDIRECT_URI\", \"$$JADDAR_WEB_ORIGIN/*\"],
+            \"webOrigins\": [\"$$JADDAR_WEB_ORIGIN\"],
+            \"publicClient\": false,
+            \"protocol\": \"openid-connect\",
+            \"standardFlowEnabled\": true,
+            \"directAccessGrantsEnabled\": true
+          }" &&
+        echo "Client created successfully!"
+      else
+        echo "Client $$JADDAR_CLIENT_ID already exists. Updating it..." &&
+        CLIENT_UUID=$$(echo $$EXISTING_CLIENT | jq -r ".[0].id") &&
+        curl -s -X PUT "http://keycloak:8080/admin/realms/master/clients/$$CLIENT_UUID" \
+          -H "Authorization: Bearer $$TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "{
+            \"clientId\": \"$$JADDAR_CLIENT_ID\",
+            \"enabled\": true,
+            \"clientAuthenticatorType\": \"client-secret\",
+            \"secret\": \"$$JADDAR_CLIENT_SECRET\",
+            \"redirectUris\": [\"$$JADDAR_REDIRECT_URI\", \"$$JADDAR_WEB_ORIGIN/*\"],
+            \"webOrigins\": [\"$$JADDAR_WEB_ORIGIN\"],
+            \"publicClient\": false,
+            \"protocol\": \"openid-connect\",
+            \"standardFlowEnabled\": true,
+            \"directAccessGrantsEnabled\": true
+          }" &&
+        echo "Client updated successfully!"
+      fi &&
+
+      echo "===== SETTING UP GROUP MEMBERSHIP MAPPER =====" &&
+      CLIENT_UUID=$$(curl -s -X GET "http://keycloak:8080/admin/realms/master/clients?clientId=$$JADDAR_CLIENT_ID" \
+        -H "Authorization: Bearer $$TOKEN" | jq -r ".[0].id") &&
+      
+      GROUPS_SCOPE=$$(curl -s -X GET "http://keycloak:8080/admin/realms/master/client-scopes" \
+        -H "Authorization: Bearer $$TOKEN" | jq -r ".[] | select(.name==\"groups\") | .id") &&
+      
+      if [ -z "$$GROUPS_SCOPE" ]; then
+        echo "Creating groups client scope..." &&
+        curl -s -X POST "http://keycloak:8080/admin/realms/master/client-scopes" \
+          -H "Authorization: Bearer $$TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "{
+            \"name\": \"groups\",
+            \"protocol\": \"openid-connect\",
+            \"attributes\": {
+              \"include.in.token.scope\": \"true\",
+              \"display.on.consent.screen\": \"false\"
+            }
+          }" &&
+        GROUPS_SCOPE=$$(curl -s -X GET "http://keycloak:8080/admin/realms/master/client-scopes" \
+          -H "Authorization: Bearer $$TOKEN" | jq -r ".[] | select(.name==\"groups\") | .id") &&
+        echo "Groups scope created: $$GROUPS_SCOPE"
+      else
+        echo "Groups scope already exists: $$GROUPS_SCOPE"
+      fi &&
+      
+      EXISTING_MAPPER=$$(curl -s -X GET "http://keycloak:8080/admin/realms/master/client-scopes/$$GROUPS_SCOPE/protocol-mappers/models" \
+        -H "Authorization: Bearer $$TOKEN" | jq -r ".[] | select(.name==\"groups\")") &&
+      
+      if [ -z "$$EXISTING_MAPPER" ]; then
+        echo "Creating groups mapper..." &&
+        curl -s -X POST "http://keycloak:8080/admin/realms/master/client-scopes/$$GROUPS_SCOPE/protocol-mappers/models" \
+          -H "Authorization: Bearer $$TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "{
+            \"name\": \"groups\",
+            \"protocol\": \"openid-connect\",
+            \"protocolMapper\": \"oid-group-membership-mapper\",
+            \"config\": {
+              \"full.path\": \"false\",
+              \"id.token.claim\": \"true\",
+              \"access.token.claim\": \"true\",
+              \"claim.name\": \"groups\",
+              \"userinfo.token.claim\": \"true\"
+            }
+          }" &&
+        echo "Groups mapper created!"
+      else
+        echo "Groups mapper already exists"
+      fi &&
+      
+      echo "Adding groups scope to client..." &&
+      curl -s -X PUT "http://keycloak:8080/admin/realms/master/clients/$$CLIENT_UUID/default-client-scopes/$$GROUPS_SCOPE" \
+        -H "Authorization: Bearer $$TOKEN" &&
+      echo "Groups scope added to client" &&
+      
+      echo "===== SETTING UP JADDAR ROLES =====" &&
+      
+      # Create jaddar_master_admin role (Level 1 - Highest)
+      EXISTING_ROLE=$$(curl -s -X GET "http://keycloak:8080/admin/realms/master/roles/jaddar_master_admin" \
+        -H "Authorization: Bearer $$TOKEN" 2>/dev/null) &&
+      if echo "$$EXISTING_ROLE" | grep -q "error\|Could not find"; then
+        echo "Creating role: jaddar_master_admin" &&
+        curl -s -X POST "http://keycloak:8080/admin/realms/master/roles" \
+          -H "Authorization: Bearer $$TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "{\"name\": \"jaddar_master_admin\", \"description\": \"Level 1: Full system access - Jaddar, Requestor Manager, and Keycloak admin\"}"
+      else
+        echo "Role jaddar_master_admin already exists"
+      fi &&
+      
+      # Create group_admin role (Level 2)
+      EXISTING_ROLE=$$(curl -s -X GET "http://keycloak:8080/admin/realms/master/roles/group_admin" \
+        -H "Authorization: Bearer $$TOKEN" 2>/dev/null) &&
+      if echo "$$EXISTING_ROLE" | grep -q "error\|Could not find"; then
+        echo "Creating role: group_admin" &&
+        curl -s -X POST "http://keycloak:8080/admin/realms/master/roles" \
+          -H "Authorization: Bearer $$TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "{\"name\": \"group_admin\", \"description\": \"Level 2: Can create and manage requestor groups, designate requestor_group_admin\"}"
+      else
+        echo "Role group_admin already exists"
+      fi &&
+      
+      # Create requestor_group_admin role (Level 3)
+      EXISTING_ROLE=$$(curl -s -X GET "http://keycloak:8080/admin/realms/master/roles/requestor_group_admin" \
+        -H "Authorization: Bearer $$TOKEN" 2>/dev/null) &&
+      if echo "$$EXISTING_ROLE" | grep -q "error\|Could not find"; then
+        echo "Creating role: requestor_group_admin" &&
+        curl -s -X POST "http://keycloak:8080/admin/realms/master/roles" \
+          -H "Authorization: Bearer $$TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "{\"name\": \"requestor_group_admin\", \"description\": \"Level 3: Can create requestors and agreements within assigned groups\"}"
+      else
+        echo "Role requestor_group_admin already exists"
+      fi &&
+      
+      # Create requestor_group_user role (Level 4 - Lowest)
+      EXISTING_ROLE=$$(curl -s -X GET "http://keycloak:8080/admin/realms/master/roles/requestor_group_user" \
+        -H "Authorization: Bearer $$TOKEN" 2>/dev/null) &&
+      if echo "$$EXISTING_ROLE" | grep -q "error\|Could not find"; then
+        echo "Creating role: requestor_group_user" &&
+        curl -s -X POST "http://keycloak:8080/admin/realms/master/roles" \
+          -H "Authorization: Bearer $$TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "{\"name\": \"requestor_group_user\", \"description\": \"Level 4: Can view/use agreement data and make RDAP requests\"}"
+      else
+        echo "Role requestor_group_user already exists"
+      fi &&
+      
+      echo "===== REMOVING OLD ROLES (if exist) =====" &&
+      for OLD_ROLE in agreement_master agreement_admin; do
+        curl -s -X DELETE "http://keycloak:8080/admin/realms/master/roles/$$OLD_ROLE" \
+          -H "Authorization: Bearer $$TOKEN" 2>/dev/null || true
+      done &&
+      echo "Old roles cleanup complete" &&
+      
+      echo "===== ASSIGNING JADDAR_MASTER_ADMIN TO ADMIN USER =====" &&
+      ADMIN_USER=$$(curl -s -X GET "http://keycloak:8080/admin/realms/master/users?username=$$KEYCLOAK_ADMIN" \
+        -H "Authorization: Bearer $$TOKEN" \
+        -H "Content-Type: application/json") &&
+      ADMIN_USER_ID=$$(echo $$ADMIN_USER | jq -r ".[0].id") &&
+      
+      if [ "$$ADMIN_USER_ID" != "null" ] && [ -n "$$ADMIN_USER_ID" ]; then
+        echo "Admin user ID: $$ADMIN_USER_ID" &&
+        MASTER_ROLE=$$(curl -s -X GET "http://keycloak:8080/admin/realms/master/roles/jaddar_master_admin" \
+          -H "Authorization: Bearer $$TOKEN" \
+          -H "Content-Type: application/json") &&
+        curl -s -X POST "http://keycloak:8080/admin/realms/master/users/$$ADMIN_USER_ID/role-mappings/realm" \
+          -H "Authorization: Bearer $$TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "[$$MASTER_ROLE]" &&
+        echo "Assigned jaddar_master_admin role to admin user"
+      fi &&
+      
+      echo "===== LISTING ALL REALM ROLES =====" &&
+      ALL_ROLES=$$(curl -s -X GET "http://keycloak:8080/admin/realms/master/roles" \
+        -H "Authorization: Bearer $$TOKEN") &&
+      echo "Available roles:" &&
+      echo "$$ALL_ROLES" | jq -r ".[].name" &&
+      
+      echo "===== SETUP COMPLETE ====="
+      '
+ 
+  # Jaddar main backend
+  jaddar-backend:
+    image: jaddar-backend:latest
+    container_name: jaddar-backend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      # Sensitive admin/token/refresh hop -> encrypted https:8443 (keycloakWebClient trusts the dev CA).
+      - JADDAR_KEYCLOAK_AUTH_URL=${JADDAR_KEYCLOAK_AUTH_URL:-https://keycloak:8443/realms/master}
+      # Public-key JWKS fetch stays on plain http (leaks nothing; Nimbus decoder trusts only cacerts).
+      - JADDAR_JWKS_URL=${JADDAR_JWKS_URL:-http://keycloak:8080/realms/master}
+      - JADDAR_PUBLIC_AUTH_URL=${JADDAR_PUBLIC_AUTH_URL}
+      - JADDAR_CLIENT_ID=${JADDAR_CLIENT_ID}
+      - JADDAR_CLIENT_SECRET=${JADDAR_CLIENT_SECRET}
+      - JADDAR_REDIRECT_URI=${JADDAR_REDIRECT_URI}
+      - JADDAR_WEB_ORIGIN=${JADDAR_WEB_ORIGIN}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@admin.com}
+      - RATE_LIMIT_RPM=${RATE_LIMIT_RPM:-240}
+      # Spring datasource (replaces the python DATABASE_URL) — TLS-verified to the CA
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB}?sslmode=verify-ca&sslrootcert=/certs/infra-ca.crt
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - JADDAR_REQUESTOR_AGENT_ID=${JADDAR_REQUESTOR_AGENT_ID}
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      # Requestor Manager connection
+      - REQUESTOR_MANAGER_SERVER_URL=http://requestor-manager-backend:8081
+      # Data Holder Server connection
+      - DATAHOLDER_URL=${DATAHOLDER_URL:-http://dataholder-backend:8082}
+      # Data Holder Group Admin connection
+      - DH_GROUP_ADMIN_URL=http://dh-group-admin-backend:8083
+      # Password recovery (Twilio SendGrid)
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY:-}
+      - SENDGRID_FROM_EMAIL=${SENDGRID_FROM_EMAIL}
+      - SENDGRID_FROM_NAME=${SENDGRID_FROM_NAME:-Jaddar}
+      - JADDAR_FRONTEND_URL=${JADDAR_FRONTEND_URL}
+      - PASSWORD_RESET_EXPIRY_MINUTES=${PASSWORD_RESET_EXPIRY_MINUTES:-60}
+      # Mutual TLS — jaddar is client-only; peer URLs above (http) are rewritten onto the peers' mTLS listeners at runtime.
+      - MTLS_ENABLED=${MTLS_ENABLED:-true}
+      - MTLS_KEY_STORE=/certs/jaddar-backend.p12
+      - MTLS_KEY_STORE_PASSWORD=${MTLS_KEYSTORE_PASSWORD:-changeit}
+      - MTLS_TRUST_STORE=/certs/jaddar-truststore.p12
+      - MTLS_TRUST_STORE_PASSWORD=${MTLS_TRUSTSTORE_PASSWORD:-changeit}
+    volumes:
+      # mTLS certs — supply real production certs here (see scripts/generate-mtls-certs.sh for the dev CA)
+      - ./certs:/certs:ro
+    depends_on:
+      keycloak-setup:
+        condition: service_completed_successfully
+      postgres-setup:
+        condition: service_completed_successfully
+      requestor-manager-backend:
+        condition: service_started
+    networks:
+      - app-network
+
+  # Requestor Manager Backend Server (Java/Spring Boot)
+  requestor-manager-backend:
+    image: requestor-manager-backend:latest
+    container_name: requestor-manager-backend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8081:8081"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/agreement_db?sslmode=verify-ca&sslrootcert=/certs/infra-ca.crt
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      - JWT_SECRET=${REQUESTOR_MANAGER_JWT_SECRET}
+      - MASTER_USER_EMAIL=${REQUESTOR_MANAGER_MASTER_EMAIL}
+      - MASTER_USER_PASSWORD=${REQUESTOR_MANAGER_MASTER_PASSWORD}
+      # Keycloak integration for external API token validation
+      - KEYCLOAK_INTROSPECT_URL=https://keycloak:8443/realms/master/protocol/openid-connect/token/introspect
+      - KEYCLOAK_TOKEN_URL=https://keycloak:8443/realms/master/protocol/openid-connect/token
+      - KEYCLOAK_ADMIN_URL=https://keycloak:8443/admin/realms/master
+      - KEYCLOAK_CLIENT_ID=${JADDAR_CLIENT_ID}
+      - KEYCLOAK_CLIENT_SECRET=${JADDAR_CLIENT_SECRET}
+      # Admin credentials for user management
+      - KEYCLOAK_ADMIN_USERNAME=${KEYCLOAK_ADMIN}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      # Proxy/Swagger configuration for /agreements path prefix
+      - SERVER_FORWARD_HEADERS_STRATEGY=framework
+      - SERVER_SERVLET_CONTEXT_PATH=/agreements
+      - SPRINGDOC_SWAGGER_UI_CONFIG_URL=/agreements/v3/api-docs/swagger-config
+      - SPRINGDOC_SWAGGER_UI_URL=/agreements/v3/api-docs
+      - SPRINGDOC_SERVERS_0_URL=/agreements
+      - SPRINGDOC_SERVERS_0_DESCRIPTION=Requestor Manager API
+      # Password recovery (Twilio SendGrid)
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY:-}
+      - SENDGRID_FROM_EMAIL=${SENDGRID_FROM_EMAIL}
+      - SENDGRID_FROM_NAME=${SENDGRID_FROM_NAME:-Requestor Manager}
+      - REQUESTOR_MANAGER_FRONTEND_URL=${REQUESTOR_MANAGER_FRONTEND_URL}
+      - PASSWORD_RESET_EXPIRY_MINUTES=${PASSWORD_RESET_EXPIRY_MINUTES:-60}
+      # Mutual TLS listener for inter-service calls (jaddar, DH callback)
+      - MTLS_ENABLED=${MTLS_ENABLED:-true}
+      - MTLS_PORT=8481
+      - MTLS_KEY_STORE=/certs/requestor-manager-backend.p12
+      - MTLS_KEY_STORE_PASSWORD=${MTLS_KEYSTORE_PASSWORD:-changeit}
+      - MTLS_TRUST_STORE=/certs/requestor-manager-truststore.p12
+      - MTLS_TRUST_STORE_PASSWORD=${MTLS_TRUSTSTORE_PASSWORD:-changeit}
+    volumes:
+      # mTLS certs — supply real production certs here (see scripts/generate-mtls-certs.sh for the dev CA)
+      - ./certs:/certs:ro
+    depends_on:
+      postgres-setup:
+        condition: service_completed_successfully
+      keycloak-setup:
+        condition: service_completed_successfully
+    networks:
+      - app-network
+
+  # Requestor Manager Frontend
+  requestor-manager-frontend:
+    image: requestor-manager-frontend:latest
+    container_name: requestor-manager-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3002:3000"
+    environment:
+      - REACT_APP_API_URL=${REQUESTOR_MANAGER_FRONTEND_API_URL}
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
+      - SOURCE_CODE_URL=${SOURCE_CODE_URL:-}
+    depends_on:
+      - requestor-manager-backend
+    networks:
+      - app-network
+
+  # Data Holder Group Admin Backend (Java/Spring Boot)
+  dh-group-admin-backend:
+    image: dh-group-admin-backend:latest
+    container_name: dh-group-admin-backend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8083:8083"
+    environment:
+      # Database — TLS-verified to the CA
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/dhgroupadmin_db?sslmode=verify-ca&sslrootcert=/certs/infra-ca.crt
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      # Keycloak integration (shared with Jaddar)
+      - KEYCLOAK_INTROSPECT_URL=https://keycloak:8443/realms/master/protocol/openid-connect/token/introspect
+      - KEYCLOAK_TOKEN_URL=https://keycloak:8443/realms/master/protocol/openid-connect/token
+      - KEYCLOAK_ADMIN_URL=https://keycloak:8443/admin/realms/master
+      - KEYCLOAK_CLIENT_ID=${JADDAR_CLIENT_ID}
+      - KEYCLOAK_CLIENT_SECRET=${JADDAR_CLIENT_SECRET}
+      - KEYCLOAK_ADMIN_USERNAME=${KEYCLOAK_ADMIN}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      - DHG_JWT_SECRET=${DHG_JWT_SECRET}
+      # CORS
+      - CORS_ALLOWED_ORIGINS=${DH_GROUP_ADMIN_CORS_ORIGINS}
+      # Proxy/Swagger configuration
+      - SERVER_FORWARD_HEADERS_STRATEGY=framework
+      - SERVER_SERVLET_CONTEXT_PATH=/dh-group-admin
+      # Provisioning sidecar (reached over mTLS; the sidecar requires a client cert)
+      - PROVISIONER_URL=${PROVISIONER_URL:-https://provisioning-sidecar:9500}
+      - DHG_PROVISIONER_SECRET=${DHG_PROVISIONER_SECRET}
+      # Default admin (first-run only)
+      - DHG_ADMIN_DEFAULT_EMAIL=${DHG_ADMIN_DEFAULT_EMAIL}
+      - DHG_ADMIN_DEFAULT_PASSWORD=${DHG_ADMIN_DEFAULT_PASSWORD}
+      # Password recovery (Twilio SendGrid)
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY:-}
+      - SENDGRID_FROM_EMAIL=${SENDGRID_FROM_EMAIL}
+      - SENDGRID_FROM_NAME=${SENDGRID_FROM_NAME:-Data Holder Group Admin}
+      - DHG_ADMIN_FRONTEND_URL=${DHG_ADMIN_FRONTEND_URL}
+      - PASSWORD_RESET_EXPIRY_MINUTES=${PASSWORD_RESET_EXPIRY_MINUTES:-60}
+      # Mutual TLS listener for inter-service calls (RM, DH); presents client cert to the sidecar
+      - MTLS_ENABLED=${MTLS_ENABLED:-true}
+      - MTLS_PORT=8483
+      - MTLS_KEY_STORE=/certs/dh-group-admin-backend.p12
+      - MTLS_KEY_STORE_PASSWORD=${MTLS_KEYSTORE_PASSWORD:-changeit}
+      - MTLS_TRUST_STORE=/certs/dh-group-admin-truststore.p12
+      - MTLS_TRUST_STORE_PASSWORD=${MTLS_TRUSTSTORE_PASSWORD:-changeit}
+    volumes:
+      # mTLS certs — supply real production certs here (see scripts/generate-mtls-certs.sh for the dev CA)
+      - ./certs:/certs:ro
+    depends_on:
+      postgres-setup:
+        condition: service_completed_successfully
+      keycloak-setup:
+        condition: service_completed_successfully
+    networks:
+      - app-network
+
+  # Data Holder Group Admin Frontend (React)
+  dh-group-admin-frontend:
+    image: dh-group-admin-frontend:latest
+    container_name: dh-group-admin-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3003:3000"
+    environment:
+      - REACT_APP_API_URL=${DH_GROUP_ADMIN_FRONTEND_API_URL}
+      - REACT_APP_PARENT_DOMAIN=${DHG_PARENT_DOMAIN}
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
+      - SOURCE_CODE_URL=${SOURCE_CODE_URL:-}
+    depends_on:
+      - dh-group-admin-backend
+    networks:
+      - app-network
+
+  # Provisioning Sidecar — manages DH instance lifecycle
+  provisioning-sidecar:
+    image: provisioning-sidecar:latest
+    container_name: provisioning-sidecar
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9500:9500"
+    environment:
+      - DHG_PROVISIONER_SECRET=${DHG_PROVISIONER_SECRET}
+      - DHG_PARENT_DOMAIN=${DHG_PARENT_DOMAIN}
+      - DOCKER_NETWORK=${COMPOSE_PROJECT_NAME:-icann}_app-network
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      # TLS-verified connection to Postgres
+      - DB_SSLMODE=verify-ca
+      - DB_SSLROOTCERT=/certs/infra-ca.crt
+      # Passed to spawned DH instances for their token-introspection hop (the live knob).
+      - KEYCLOAK_AUTH_SERVER_URL=https://keycloak:8443
+      - KEYCLOAK_INTROSPECT_URL=http://keycloak:8080/realms/master/protocol/openid-connect/token/introspect
+      - KEYCLOAK_CLIENT_ID=${JADDAR_CLIENT_ID}
+      - KEYCLOAK_CLIENT_SECRET=${JADDAR_CLIENT_SECRET}
+      - DH_GROUP_ADMIN_URL=http://dh-group-admin-backend:8083/dh-group-admin
+      - DH_BACKEND_IMAGE=dataholder-backend:latest
+      - DH_FRONTEND_IMAGE=dataholder-frontend:latest
+      # Mutual TLS — the whole sidecar port flips to client-auth TLS when enabled
+      - MTLS_ENABLED=${MTLS_ENABLED:-true}
+      - MTLS_CERT_FILE=/certs/provisioning-sidecar.crt
+      - MTLS_KEY_FILE=/certs/provisioning-sidecar.key
+      - MTLS_CA_FILE=/certs/provisioning-sidecar-truststore.crt
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/nginx/conf.d:/host-nginx-conf
+      - /etc/letsencrypt:/host-letsencrypt
+      # mTLS certs — supply real production certs here (see scripts/generate-mtls-certs.sh for the dev CA)
+      - ./certs:/certs:ro
+    depends_on:
+      postgres-setup:
+        condition: service_completed_successfully
+    networks:
+      - app-network
+
+  # React Frontend (Requestor / Jaddar main UI)
+  jaddar-frontend:
+    image: jaddar-frontend:latest
+    container_name: jaddar-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - REACT_APP_API_URL=${REACT_APP_API_URL}
+      - REACT_APP_AUTH_URL=${REACT_APP_AUTH_URL}
+      - REACT_APP_CLIENT_ID=${JADDAR_CLIENT_ID}
+      - REACT_APP_KEYCLOAK_ADMIN_URL=${REACT_APP_KEYCLOAK_ADMIN_URL}
+      - REACT_APP_DATAHOLDER_URL=${DATAHOLDER_URL:-http://dataholder-backend:8082}
+      - REACT_APP_VERSION=${REACT_APP_VERSION:-1.0.9}
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
+      - SOURCE_CODE_URL=${SOURCE_CODE_URL:-}
+    depends_on:
+      - jaddar-backend
+    networks:
+      - app-network
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres-db
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      # TLS: stage the CA-signed server cert with correct perms before start
+      - DB_SSL_CERT_NAME=postgres
+      - DB_SSL_OWNER=postgres
+    entrypoint: ["/usr/local/bin/db-ssl-entrypoint.sh"]
+    command:
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/etc/db-certs/server.crt
+      - -c
+      - ssl_key_file=/etc/db-certs/server.key
+      - -c
+      - ssl_ca_file=/etc/db-certs/ca.crt
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./certs:/certs:ro
+      - ./scripts/db-ssl-entrypoint.sh:/usr/local/bin/db-ssl-entrypoint.sh:ro
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  # Data Holder Backend
+  # Document Scanner Sidecar
+  # Validates request-type file attachments against the format criteria authored on the
+  # request type's file parameter. Called by dataholder-backend at upload time.
+  document-scanner:
+    image: document-scanner:latest
+    container_name: document-scanner
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9600:9600"
+    environment:
+      - DOCUMENT_SCANNER_SECRET=${DOCUMENT_SCANNER_SECRET:?DOCUMENT_SCANNER_SECRET must be set}
+      - SCANNER_MAX_FILE_MB=${SCANNER_MAX_FILE_MB:-25}
+      - SCANNER_MAX_OCR_PAGES=${SCANNER_MAX_OCR_PAGES:-10}
+      - SCANNER_OCR_DPI=${SCANNER_OCR_DPI:-300}
+      - SCANNER_WORKERS=${SCANNER_WORKERS:-2}
+      # Scanner-specific so it can run before its certs exist; flip on once minted.
+      - MTLS_ENABLED=${SCANNER_MTLS_ENABLED:-false}
+      - MTLS_CERT_FILE=/certs/document-scanner.crt
+      - MTLS_KEY_FILE=/certs/document-scanner.key
+      - MTLS_CA_FILE=/certs/document-scanner-truststore.crt
+    volumes:
+      - ./certs:/certs:ro
+    networks:
+      - app-network
+
+  dataholder-backend:
+    image: dataholder-backend:latest
+    container_name: dataholder-backend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8082:8082"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/dataholder_db?sslmode=verify-ca&sslrootcert=/certs/infra-ca.crt
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
+      # Sensitive introspection/token hop -> encrypted https:8443 (WebClient already trusts the dev CA).
+      - KEYCLOAK_AUTH_SERVER_URL=https://keycloak:8443
+      - KEYCLOAK_INTROSPECT_URL=http://keycloak:8080/realms/master/protocol/openid-connect/token/introspect
+      - KEYCLOAK_CLIENT_ID=${JADDAR_CLIENT_ID}
+      - KEYCLOAK_CLIENT_SECRET=${JADDAR_CLIENT_SECRET}
+      - DATAHOLDER_JWT_SECRET=${DATAHOLDER_JWT_SECRET}
+      - CORS_ALLOWED_ORIGINS=${DATAHOLDER_CORS_ORIGINS}
+      - DATAHOLDER_NAME=${DATAHOLDER_NAME:-Test Data Holder}
+      - DATAHOLDER_ID=${DATAHOLDER_ID:-TDH-001}
+      - DEFAULT_ACCESS_LEVEL=${DATAHOLDER_ACCESS_LEVEL:-1}
+      - REQUIRE_AGREEMENT=${DATAHOLDER_REQUIRE_AGREEMENT:-true}
+      - MANUAL_VERIFICATION_ENABLED=${DATAHOLDER_MANUAL_VERIFICATION:-false}
+      - MANUAL_VERIFICATION_LEVEL=${DATAHOLDER_MANUAL_VERIFICATION_LEVEL:-3}
+      - DATAHOLDER_NOTIFICATION_MAIL_ENDPOINT=${DATAHOLDER_NOTIFICATION_MAIL_ENDPOINT}
+      - DATAHOLDER_NOTIFICATION_ENABLED=${DATAHOLDER_NOTIFICATION_ENABLED:-true}
+      - DATAHOLDER_NOTIFICATION_FROM_EMAIL=${DATAHOLDER_NOTIFICATION_FROM_EMAIL:-noreply@dataholder.local}
+      - DATAHOLDER_NOTIFICATION_FROM_NAME=${DATAHOLDER_NOTIFICATION_FROM_NAME:-RDAP Data Holder}
+      - ADMIN_USERNAME=${DATAHOLDER_ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${DATAHOLDER_ADMIN_PASSWORD}
+      # Password recovery (Twilio SendGrid)
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY:-}
+      - SENDGRID_FROM_EMAIL=${SENDGRID_FROM_EMAIL}
+      - SENDGRID_FROM_NAME=${SENDGRID_FROM_NAME:-Data Holder Admin}
+      - DATAHOLDER_FRONTEND_URL=${DATAHOLDER_FRONTEND_URL}
+      - PASSWORD_RESET_EXPIRY_MINUTES=${PASSWORD_RESET_EXPIRY_MINUTES:-60}
+      # Data Holder Group Admin connection
+      - DH_GROUP_ADMIN_URL=http://dh-group-admin-backend:8083/dh-group-admin
+      - DOCUMENT_SCANNER_URL=http://document-scanner:9600
+      - DOCUMENT_SCANNER_SECRET=${DOCUMENT_SCANNER_SECRET:?DOCUMENT_SCANNER_SECRET must be set}
+      - DATAHOLDER_FILE_UPLOAD_DIR=/app/uploads
+      # Mutual TLS listener for inter-service calls (jaddar RDAP, DHG status callback); DH_GROUP_ADMIN_URL above (http) is rewritten onto DHG's mTLS listener at runtime.
+      - MTLS_ENABLED=${MTLS_ENABLED:-true}
+      - MTLS_PORT=8482
+      - MTLS_KEY_STORE=/certs/dataholder-backend.p12
+      - MTLS_KEY_STORE_PASSWORD=${MTLS_KEYSTORE_PASSWORD:-changeit}
+      - MTLS_TRUST_STORE=/certs/dataholder-truststore.p12
+      - MTLS_TRUST_STORE_PASSWORD=${MTLS_TRUSTSTORE_PASSWORD:-changeit}
+    volumes:
+      - dataholder_uploads:/app/uploads
+      # mTLS certs — supply real production certs here (see scripts/generate-mtls-certs.sh for the dev CA)
+      - ./certs:/certs:ro
+    depends_on:
+      postgres-setup:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_started
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Data Holder Frontend
+  dataholder-frontend:
+    image: dataholder-frontend:latest
+    container_name: dataholder-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3000"
+    environment:
+      - REACT_APP_API_URL=${DATAHOLDER_FRONTEND_API_URL}
+      - REACT_APP_REQUESTOR_API_URL=${REACT_APP_API_URL}
+      - REACT_APP_VERSION=1.0.9
+      - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
+      - SOURCE_CODE_URL=${SOURCE_CODE_URL:-}
+    depends_on:
+      - dataholder-backend
+    networks:
+      - app-network
+
+  # PostgreSQL Setup - Creates additional databases if they don't exist
+  postgres-setup:
+    image: postgres:15-alpine
+    container_name: postgres-setup
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app-network
+    environment:
+      - PGPASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_USER=${POSTGRES_USER}
+    command: |
+      sh -c '
+      echo "===== CREATING DATABASES IF NEEDED =====" &&
+      
+      psql -h postgres -U $$POSTGRES_USER -d postgres -tc \
+        "SELECT 1 FROM pg_database WHERE datname = '"'"'agreement_db'"'"'" | grep -q 1 || \
+        psql -h postgres -U $$POSTGRES_USER -d postgres -c "CREATE DATABASE agreement_db;" &&
+      echo "✓ agreement_db ready" &&
+      
+      psql -h postgres -U $$POSTGRES_USER -d postgres -tc \
+        "SELECT 1 FROM pg_database WHERE datname = '"'"'keycloak_db'"'"'" | grep -q 1 || \
+        psql -h postgres -U $$POSTGRES_USER -d postgres -c "CREATE DATABASE keycloak_db;" &&
+      echo "✓ keycloak_db ready" &&
+
+      psql -h postgres -U $$POSTGRES_USER -d postgres -tc \
+        "SELECT 1 FROM pg_database WHERE datname = '"'"'dataholder_db'"'"'" | grep -q 1 || \
+        psql -h postgres -U $$POSTGRES_USER -d postgres -c "CREATE DATABASE dataholder_db;" &&
+      echo "✓ dataholder_db ready" &&
+
+      psql -h postgres -U $$POSTGRES_USER -d postgres -tc \
+        "SELECT 1 FROM pg_database WHERE datname = '"'"'dhgroupadmin_db'"'"'" | grep -q 1 || \
+        psql -h postgres -U $$POSTGRES_USER -d postgres -c "CREATE DATABASE dhgroupadmin_db;" &&
+      echo "✓ dhgroupadmin_db ready" &&
+      
+      echo "===== ALL DATABASES READY ====="
+      '
+
+volumes:
+  dataholder_uploads:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge

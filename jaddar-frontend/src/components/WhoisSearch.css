@@ -1,0 +1,206 @@
+/*
+ * SPDX-FileCopyrightText: 2025-2026 Edgemoor Research Institute and Derek Jenkins
+ * SPDX-License-Identifier: AGPL-3.0-only
+ *
+ * Author: Derek Jenkins <derek@pure-code.net>
+ * Additional terms under AGPL-3.0 Section 7 apply. See NOTICE at the repository root.
+ */
+
+/* frontend/src/components/WhoisSearch.css */
+.whois-search-container {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-top: 2rem;
+}
+
+.whois-search-header {
+  margin-bottom: 1.5rem;
+}
+
+.whois-search-header h2 {
+  color: #333;
+  margin-bottom: 1rem;
+}
+
+.search-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.search-input {
+  flex: 1;
+  padding: 10px 15px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.search-input:disabled {
+  background-color: #f0f0f0;
+  cursor: not-allowed;
+}
+
+.search-button {
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 10px 25px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.search-button:hover:not(:disabled) {
+  background: #5a67d8;
+}
+
+.search-button:disabled {
+  background: #a0a0a0;
+  cursor: not-allowed;
+}
+
+.clear-button {
+  background: #e53e3e;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.clear-button:hover {
+  background: #c53030;
+}
+
+.error-message {
+  color: #e53e3e;
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.whois-table-container {
+  overflow-x: auto;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.whois-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.whois-table thead {
+  background: #f7fafc;
+}
+
+.whois-table th {
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #4a5568;
+  border-bottom: 2px solid #e2e8f0;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.whois-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #2d3748;
+  font-size: 14px;
+}
+
+.whois-table tbody tr:hover {
+  background: #f7fafc;
+}
+
+.domain-cell {
+  font-weight: 600;
+  color: #667eea;
+}
+
+.nameserver-cell {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.status-active {
+  background: #c6f6d5;
+  color: #22543d;
+}
+
+.status-pending {
+  background: #fed7d7;
+  color: #742a2a;
+}
+
+.status-expired {
+  background: #feebc8;
+  color: #7c2d12;
+}
+
+.empty-row td {
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.empty-state {
+  color: #a0aec0;
+}
+
+.empty-text {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #718096;
+}
+
+.empty-instruction {
+  font-size: 14px;
+  color: #a0aec0;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .search-controls {
+    flex-direction: column;
+  }
+
+  .search-input,
+  .search-button,
+  .clear-button {
+    width: 100%;
+  }
+
+  .whois-table {
+    font-size: 12px;
+  }
+
+  .whois-table th,
+  .whois-table td {
+    padding: 8px;
+  }
+}
