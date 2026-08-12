@@ -145,11 +145,15 @@ cat jaddar-ca.crt rm-ca.crt dhg-ca.crt dh-ca.crt > provisioning-sidecar-truststo
 # Tidy the serial files openssl leaves behind.
 rm -f ./*.srl
 
-# Stage the infra CA into the dataholder-backend build context. Dynamically-spawned DH
-# instances get no mounted certs, so the image bakes this into the JVM truststore to trust
-# the infra-CA-signed Keycloak over HTTPS.
-cp -f "$CERT_DIR/infra-ca.crt" "$ROOT_DIR/dataholder-backend/infra-ca.crt"
-echo "==> Staged infra-ca.crt into dataholder-backend/ (baked into the image for spawned instances)"
+# Stage the infra CA into each backend build context, where the Dockerfiles bake it into the
+# JVM truststore. Every backend makes plain outbound HTTPS calls to infra-CA-signed services
+# (Keycloak's 8443 listener in particular) using a RestTemplate that consults the default
+# truststore, not the mTLS truststores — without this those calls fail PKIX validation.
+# Dynamically-spawned data holder instances additionally get no mounted certs at all.
+for svc in dataholder-backend dh-group-admin-backend requestor-manager-backend jaddar-backend; do
+  cp -f "$CERT_DIR/infra-ca.crt" "$ROOT_DIR/$svc/infra-ca.crt"
+done
+echo "==> Staged infra-ca.crt into each backend build context (baked into the images)"
 
 echo
 echo "Done. Certificates written to: $CERT_DIR"

@@ -17,8 +17,11 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriUtils;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
@@ -30,6 +33,12 @@ import java.util.*;
 @RequiredArgsConstructor
 @Slf4j
 public class KeycloakClientProvisioningService {
+
+    /**
+     * Client role whose presence in a token puts this client in the token's audience, which is what
+     * Keycloak requires before it will introspect. See {@link #grantIntrospectionAudience}.
+     */
+    private static final String INTROSPECTION_ROLE = "introspect";
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
@@ -83,6 +92,8 @@ public class KeycloakClientProvisioningService {
             log.warn("Keycloak client '{}' already exists (uuid: {}), regenerating secret",
                     clientId, existingUuid);
             String secret = regenerateClientSecret(adminToken, existingUuid);
+            // Re-assert the audience grant: re-provisioning must converge on a working client.
+            grantIntrospectionAudience(adminToken, existingUuid, clientId, requestorGroupName);
             return new ProvisionedClient(clientId, existingUuid, secret, introspectUrl, tokenUrl);
         }
 
@@ -123,6 +134,9 @@ public class KeycloakClientProvisioningService {
 
             // Retrieve the generated secret
             String secret = getClientSecret(adminToken, clientUuid);
+
+            // Without this the client can authenticate but Keycloak still refuses to introspect.
+            grantIntrospectionAudience(adminToken, clientUuid, clientId, requestorGroupName);
 
             log.info("Successfully provisioned Keycloak client '{}' (uuid: {})", clientId, clientUuid);
 
@@ -241,6 +255,129 @@ public class KeycloakClientProvisioningService {
      *   - No standard/implicit/direct flows
      *   - No redirect URIs (not for user login)
      */
+    // ==================== Introspection audience ====================
+
+    /**
+     * Make this client introspectable for the requestor group's tokens.
+     *
+     * Keycloak refuses to introspect a token unless the calling client is in that token's audience:
+     * {@code Introspection denied: client '...' not in audience of token for '...'}. Authenticating
+     * successfully is not enough. Rather than adding an audience mapper to the shared login client —
+     * which would accumulate one mapper per subscription and mutate a client every requestor uses —
+     * this creates a client role and assigns it to the requestor group. Keycloak's default
+     * "audience resolve" mapper then adds the client to {@code aud} for exactly those users, because
+     * their tokens carry a role for it.
+     *
+     * That also puts the client under {@code resource_access} in the token, which the data holder's
+     * requestor-group binding check reads.
+     *
+     * Failures are logged rather than thrown: the client and its secret are already usable, and
+     * aborting here would leave an orphaned Keycloak client behind. The log says plainly that
+     * introspection will be denied until this is repaired, because a silent gap here looks exactly
+     * like a working subscription.
+     */
+    private void grantIntrospectionAudience(String adminToken, String clientUuid, String clientId,
+                                            String requestorGroupName) {
+        try {
+            ensureClientRole(adminToken, clientUuid, clientId);
+
+            Map<String, Object> role = getClientRole(adminToken, clientUuid);
+            if (role == null) {
+                log.error("Could not read the '{}' role on client '{}' — introspection will be DENIED by "
+                        + "Keycloak until this client is in the token audience.", INTROSPECTION_ROLE, clientId);
+                return;
+            }
+
+            String groupId = findGroupIdByName(adminToken, requestorGroupName);
+            if (groupId == null) {
+                log.error("No Keycloak group named '{}' for client '{}' — introspection will be DENIED by "
+                                + "Keycloak until this client is in the token audience. The requestor group "
+                                + "must exist in Keycloak (see the requestor-group sync).",
+                        requestorGroupName, clientId);
+                return;
+            }
+
+            assignClientRoleToGroup(adminToken, groupId, clientUuid, role);
+
+            log.info("Granted '{}' on client '{}' to Keycloak group '{}' — that group's tokens now carry "
+                    + "this client in their audience", INTROSPECTION_ROLE, clientId, requestorGroupName);
+
+        } catch (Exception e) {
+            log.error("Failed to grant the introspection audience for client '{}' (group '{}'): {}. "
+                            + "Introspection will be DENIED by Keycloak until this client is in the token audience.",
+                    clientId, requestorGroupName, e.getMessage());
+        }
+    }
+
+    /** Create the introspection role on the client. An existing role (409) is success. */
+    private void ensureClientRole(String adminToken, String clientUuid, String clientId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(adminToken);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, Object> role = new LinkedHashMap<>();
+        role.put("name", INTROSPECTION_ROLE);
+        role.put("description", "Marks a bearer as introspectable by " + clientId
+                + ". Its presence in the token places this client in the audience.");
+
+        try {
+            restTemplate.exchange(adminUrl + "/clients/" + clientUuid + "/roles",
+                    HttpMethod.POST, new HttpEntity<>(role, headers), String.class);
+        } catch (HttpClientErrorException.Conflict e) {
+            log.debug("Client role '{}' already exists on '{}'", INTROSPECTION_ROLE, clientId);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> getClientRole(String adminToken, String clientUuid) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(adminToken);
+        try {
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    adminUrl + "/clients/" + clientUuid + "/roles/" + INTROSPECTION_ROLE,
+                    HttpMethod.GET, new HttpEntity<>(headers), Map.class);
+            return response.getBody();
+        } catch (Exception e) {
+            log.warn("Could not fetch client role '{}': {}", INTROSPECTION_ROLE, e.getMessage());
+            return null;
+        }
+    }
+
+    /** Resolve a Keycloak group by exact name. The search endpoint matches on substring. */
+    @SuppressWarnings("unchecked")
+    private String findGroupIdByName(String adminToken, String groupName) {
+        if (groupName == null || groupName.isBlank()) return null;
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(adminToken);
+        try {
+            ResponseEntity<List> response = restTemplate.exchange(
+                    adminUrl + "/groups?search=" + UriUtils.encodeQueryParam(groupName, StandardCharsets.UTF_8),
+                    HttpMethod.GET, new HttpEntity<>(headers), List.class);
+
+            if (response.getBody() == null) return null;
+            for (Object item : response.getBody()) {
+                if (item instanceof Map<?, ?> group && groupName.equals(group.get("name"))) {
+                    return (String) group.get("id");
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not resolve Keycloak group '{}': {}", groupName, e.getMessage());
+        }
+        return null;
+    }
+
+    /** Assign the client role to the group. Keycloak treats a repeat assignment as a no-op. */
+    private void assignClientRoleToGroup(String adminToken, String groupId, String clientUuid,
+                                          Map<String, Object> role) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(adminToken);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        restTemplate.exchange(
+                adminUrl + "/groups/" + groupId + "/role-mappings/clients/" + clientUuid,
+                HttpMethod.POST, new HttpEntity<>(List.of(role), headers), String.class);
+    }
+
     private Map<String, Object> buildClientRepresentation(String clientId,
                                                            String subscriptionInternalId,
                                                            String dataHolderGroupCode,

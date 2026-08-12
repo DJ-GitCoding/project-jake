@@ -92,6 +92,20 @@ public class ResponseMapper {
         return m;
     }
 
+    /**
+     * Subscription response including the introspection client secret.
+     *
+     * Use ONLY on endpoints authenticated as a data holder: the data holder must
+     * hold the secret to authenticate at the requestor's introspection endpoint,
+     * but it must never reach the admin UI or any browser-facing response. Every
+     * other caller takes {@link #toSubscriptionResponse}, which omits it.
+     */
+    public Map<String, Object> toSubscriptionResponseForDataHolder(AgreementSubscription s) {
+        Map<String, Object> r = toSubscriptionResponse(s);
+        r.put("introspectionClientSecret", s.getIntrospectionClientSecret());
+        return r;
+    }
+
     public Map<String, Object> toSubscriptionResponse(AgreementSubscription s) {
         Map<String, Object> r = new HashMap<>();
         r.put("id", s.getId());
@@ -127,6 +141,7 @@ public class ResponseMapper {
         r.put("purpose", s.getPurpose());
         r.put("additionalTerms", s.getAdditionalTerms());
         r.put("introspectionUrl", s.getIntrospectionUrl());
+        r.put("introspectionClientId", s.getIntrospectionClientId());
         r.put("testResult", s.getTestResult());
         r.put("testDetails", s.getTestDetails());
         r.put("testStartedAt", s.getTestStartedAt());

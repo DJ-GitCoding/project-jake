@@ -108,6 +108,8 @@ public class AgreementApiDto {
         private String purpose;
         private String additionalTerms;
         private String introspectionUrl;
+        private String introspectionClientId;
+        private String introspectionClientSecret;
         private LocalDateTime requestedEffectiveFrom;
         private LocalDateTime requestedEffectiveTo;
     }

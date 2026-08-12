@@ -109,6 +109,21 @@ public class AgreementSubscription {
     @Column(name = "introspection_url", length = 500)
     private String introspectionUrl;
 
+    /**
+     * Client ID a data holder authenticates with when calling
+     * {@link #introspectionUrl}. RFC 7662 §2.1 requires the introspection
+     * endpoint to authenticate its caller, so the URL alone is not usable.
+     */
+    @Column(name = "introspection_client_id", length = 255)
+    private String introspectionClientId;
+
+    /**
+     * Client secret paired with {@link #introspectionClientId}. Released only to
+     * authenticated data holders, never through the admin UI responses.
+     */
+    @Column(name = "introspection_client_secret", length = 512)
+    private String introspectionClientSecret;
+
     // ==================== Subscription Details ====================
 
     @Column(name = "granted_sensitivity_level") private Integer grantedSensitivityLevel;

@@ -70,7 +70,7 @@ public class RdapService {
             boolean confidential, boolean exigent, boolean jakeCompliance,
             String authHeader, String clientIp, Map<String, Object> customParams) {
         long startTime = System.currentTimeMillis();
-        AuthResult auth = authenticate(authHeader);
+        AuthResult auth = authenticate(authHeader, null);
         if (!auth.isSuccess()) return RdapQueryResult.error(401, "Unauthorized", auth.getMessage(), "domain", domain);
 
         Optional<RdapEntity> entityOpt = resolveEntity("domain", domain);
@@ -91,7 +91,7 @@ public class RdapService {
             boolean confidential, boolean exigent, boolean jakeCompliance,
             String authHeader, String clientIp, Map<String, Object> customParams) {
         long startTime = System.currentTimeMillis();
-        AuthResult auth = authenticate(authHeader);
+        AuthResult auth = authenticate(authHeader, null);
         if (!auth.isSuccess()) return RdapQueryResult.error(401, "Unauthorized", auth.getMessage(), "ip", ipAddress);
 
         Optional<RdapEntity> entityOpt = resolveEntity("ip", ipAddress);
@@ -112,7 +112,7 @@ public class RdapService {
             boolean confidential, boolean exigent, boolean jakeCompliance,
             String authHeader, String clientIp, Map<String, Object> customParams) {
         long startTime = System.currentTimeMillis();
-        AuthResult auth = authenticate(authHeader);
+        AuthResult auth = authenticate(authHeader, null);
         if (!auth.isSuccess()) return RdapQueryResult.error(401, "Unauthorized", auth.getMessage(), "asn", asn);
 
         String asnStr = asn.toUpperCase().replace("AS", "");
@@ -141,7 +141,7 @@ public class RdapService {
             boolean confidential, boolean exigent, boolean jakeCompliance,
             String authHeader, String clientIp, Map<String, Object> customParams) {
         long startTime = System.currentTimeMillis();
-        AuthResult auth = authenticate(authHeader);
+        AuthResult auth = authenticate(authHeader, requestorGroupCode);
         if (!auth.isSuccess()) return RdapQueryResult.error(401, "Unauthorized", auth.getMessage(), "domain", domain);
 
         Optional<RdapEntity> entityOpt = resolveEntity("domain", domain);
@@ -165,7 +165,7 @@ public class RdapService {
             boolean confidential, boolean exigent, boolean jakeCompliance,
             String authHeader, String clientIp, Map<String, Object> customParams) {
         long startTime = System.currentTimeMillis();
-        AuthResult auth = authenticate(authHeader);
+        AuthResult auth = authenticate(authHeader, requestorGroupCode);
         if (!auth.isSuccess()) return RdapQueryResult.error(401, "Unauthorized", auth.getMessage(), "ip", ipAddress);
 
         Optional<RdapEntity> entityOpt = resolveEntity("ip", ipAddress);
@@ -189,7 +189,7 @@ public class RdapService {
             boolean confidential, boolean exigent, boolean jakeCompliance,
             String authHeader, String clientIp, Map<String, Object> customParams) {
         long startTime = System.currentTimeMillis();
-        AuthResult auth = authenticate(authHeader);
+        AuthResult auth = authenticate(authHeader, requestorGroupCode);
         if (!auth.isSuccess()) return RdapQueryResult.error(401, "Unauthorized", auth.getMessage(), "asn", asn);
 
         String asnStr = asn.toUpperCase().replace("AS", "");
@@ -554,12 +554,23 @@ public class RdapService {
 
     // ==================== PRIVATE HELPERS ====================
 
-    private AuthResult authenticate(String authHeader) {
+    /**
+     * Authenticate an RDAP query by introspecting the presented bearer token
+     * against the introspection URL registered on the requestor group's
+     * subscription.
+     *
+     * @param requestorGroupCode the group code from the query, or null for
+     *                           legacy agreement-name queries that carry none
+     */
+    private AuthResult authenticate(String authHeader, String requestorGroupCode) {
         if (isAdmin(authHeader)) return AuthResult.admin(adminTokenInfo());
         String token = tokenIntrospectionService.extractToken(authHeader);
         if (token == null) return AuthResult.failure("Bearer token required");
-        TokenInfo info = tokenIntrospectionService.introspectToken(token);
-        return (info == null || !info.isActive()) ? AuthResult.failure("Invalid token") : AuthResult.user(info);
+        TokenIntrospectionService.SubscriptionIntrospection introspection =
+                tokenIntrospectionService.introspectForSubscription(token, requestorGroupCode);
+        return introspection.isActive()
+                ? AuthResult.user(introspection.tokenInfo())
+                : AuthResult.failure(introspection.outcome().getUserMessage());
     }
 
     private boolean isAdmin(String authHeader) {

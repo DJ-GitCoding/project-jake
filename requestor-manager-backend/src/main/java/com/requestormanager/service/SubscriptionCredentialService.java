@@ -11,7 +11,9 @@ package com.requestormanager.service;
 import com.requestormanager.dto.SubscriptionCredentialDto;
 import com.requestormanager.entity.SubscriptionCredential;
 import com.requestormanager.entity.SubscriptionRequest;
+import com.requestormanager.entity.SubscriptionRequest.SubscriptionStatus;
 import com.requestormanager.repository.SubscriptionCredentialRepository;
+import com.requestormanager.repository.SubscriptionRequestRepository;
 import com.requestormanager.service.KeycloakClientProvisioningService.ProvisionedClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +37,7 @@ public class SubscriptionCredentialService {
     private final KeycloakClientProvisioningService keycloakService;
     private final DataHolderGroupClientService dataHolderGroupClientService;
     private final SubscriptionCredentialRepository credentialRepository;
+    private final SubscriptionRequestRepository subscriptionRequestRepository;
 
     /** Provisions a Keycloak client and delivers credentials to the data holder (main activation entry point). */
     @Transactional
@@ -160,6 +163,90 @@ public class SubscriptionCredentialService {
             log.info("Retried delivery for {} undelivered credential(s)", retried);
         }
         return retried;
+    }
+
+    /**
+     * Reconcile subscriptions whose introspection credentials never reached the data holder group.
+     *
+     * Subscriptions activated before credential delivery worked have no credentials at the group
+     * admin, so every RDAP query from them fails authentication. This fills those gaps without any
+     * manual step.
+     *
+     * @return the number of subscriptions whose credentials were repaired
+     */
+    @Transactional
+    public int reconcileMissingCredentials() {
+        List<SubscriptionRequest> active =
+                subscriptionRequestRepository.findByStatus(SubscriptionStatus.ACTIVE);
+        int repaired = 0;
+
+        log.info("Credential reconciliation: checking {} active subscription(s)", active.size());
+
+        for (SubscriptionRequest sub : active) {
+            if (sub.getDataHolderGroup() == null || sub.getExternalRequestId() == null) {
+                log.warn("Credential reconciliation: subscription {} has no {} — skipping",
+                        sub.getInternalRequestId(),
+                        sub.getDataHolderGroup() == null ? "data holder group" : "external request ID");
+                continue;
+            }
+
+            Boolean present;
+            try {
+                present = dataHolderGroupClientService.hasCredentials(
+                        sub.getDataHolderGroup().getId(), sub.getExternalRequestId());
+            } catch (Exception e) {
+                log.warn("Credential reconciliation: status check failed for subscription {}: {}",
+                        sub.getInternalRequestId(), e.getMessage());
+                continue;
+            }
+
+            if (present == null) {
+                log.warn("Credential reconciliation: could not determine credential state for subscription {} "
+                                + "(group {}, request {}) — skipping. The group admin may be unreachable or "
+                                + "may not expose /{}/credentials/status.",
+                        sub.getInternalRequestId(), sub.getRequestorGroup().getName(),
+                        sub.getExternalRequestId(), sub.getExternalRequestId());
+                continue;
+            }
+
+            if (present) {
+                credentialRepository.findBySubscriptionRequestId(sub.getId())
+                        .filter(c -> !Boolean.TRUE.equals(c.getDeliveredToDataholder()))
+                        .ifPresent(c -> {
+                            c.setDeliveredToDataholder(true);
+                            c.setDeliveredAt(LocalDateTime.now());
+                            c.setLastDeliveryError(null);
+                            credentialRepository.save(c);
+                        });
+                continue;
+            }
+
+            try {
+                SubscriptionCredential credential =
+                        credentialRepository.findBySubscriptionRequestId(sub.getId()).orElse(null);
+
+                if (credential == null) {
+                    credential = provisionAndDeliver(sub);
+                } else {
+                    credential.setDeliveryAttempts(0);
+                    deliverToDataHolderGroup(credential, sub);
+                }
+
+                if (credential != null && Boolean.TRUE.equals(credential.getDeliveredToDataholder())) {
+                    repaired++;
+                    log.info("Credential reconciliation: restored credentials for subscription {} (group {})",
+                            sub.getInternalRequestId(), sub.getRequestorGroup().getName());
+                }
+            } catch (Exception e) {
+                log.error("Credential reconciliation failed for subscription {}: {}",
+                        sub.getInternalRequestId(), e.getMessage());
+            }
+        }
+
+        if (repaired > 0) {
+            log.info("Credential reconciliation: repaired {} subscription(s)", repaired);
+        }
+        return repaired;
     }
 
     /**

@@ -127,6 +127,8 @@ public class ExternalController {
                     .requestorAgentUrl(request.getRequestorAgentUrl())
                     .requestorAgentCallbackUrl(request.getCallbackUrl())
                     .introspectionUrl(request.getIntrospectionUrl())
+                    .introspectionClientId(request.getIntrospectionClientId())
+                    .introspectionClientSecret(request.getIntrospectionClientSecret())
                     .purpose(request.getPurpose())
                     .additionalTerms(request.getAdditionalTerms())
                     .build();
@@ -272,6 +274,94 @@ public class ExternalController {
         return ResponseEntity.ok(body);
     }
 
+    /**
+     * Receives the token-introspection credentials the requestor manager provisioned for a
+     * subscription, and stores them on that subscription.
+     *
+     * The requestor manager mints a dedicated client in the requestor's identity provider and
+     * delivers it here on activation. Data holders read it back from the subscription (see
+     * {@link #getMyByGroupCode}) and authenticate with it when introspecting the bearer tokens
+     * that arrive on RDAP queries — RFC 7662 §2.1 requires the introspection endpoint to
+     * authenticate its caller, so the URL alone is not usable.
+     *
+     * Unauthenticated like the sibling workflow endpoints, and reachable over the mTLS listener.
+     */
+    @PostMapping("/{requestId}/credentials")
+    @Transactional
+    public ResponseEntity<?> receiveCredentials(@PathVariable String requestId,
+                                                 @RequestBody CredentialDeliveryRequest request) {
+        var subOpt = subscriptionRepository.findByRequestId(requestId);
+        if (subOpt.isEmpty()) {
+            log.warn("Credential delivery for unknown subscription {}", requestId);
+            return ResponseEntity.status(404).body(Map.of(
+                    "success", false, "message", "Unknown request ID: " + requestId));
+        }
+
+        if (request.getClientId() == null || request.getClientId().isBlank()
+                || request.getClientSecret() == null || request.getClientSecret().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false, "message", "clientId and clientSecret are required"));
+        }
+
+        AgreementSubscription sub = subOpt.get();
+        sub.setIntrospectionClientId(request.getClientId());
+        sub.setIntrospectionClientSecret(request.getClientSecret());
+
+        if ((sub.getIntrospectionUrl() == null || sub.getIntrospectionUrl().isBlank())
+                && request.getIntrospectionUrl() != null && !request.getIntrospectionUrl().isBlank()) {
+            sub.setIntrospectionUrl(request.getIntrospectionUrl());
+        } else if (request.getIntrospectionUrl() != null && !request.getIntrospectionUrl().isBlank()
+                && !request.getIntrospectionUrl().equals(sub.getIntrospectionUrl())) {
+            log.info("Credential delivery for {} carried introspection URL {} but the subscription "
+                            + "already registers {} — keeping the registered one",
+                    requestId, request.getIntrospectionUrl(), sub.getIntrospectionUrl());
+        }
+        subscriptionRepository.save(sub);
+
+        audit.logApi("RECEIVE_CREDENTIALS", "SUBSCRIPTION", requestId,
+                sub.getRequestorGroupName(), "EXTERNAL", AuditService.SRC_EXTERNAL,
+                "Stored introspection credentials (clientId: " + request.getClientId() + ")");
+
+        log.info("Stored introspection credentials for subscription {} (clientId: {})",
+                requestId, request.getClientId());
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "requestId", requestId,
+                "message", "Introspection credentials stored"));
+    }
+
+    /**
+     * Reports whether a subscription already has introspection credentials, so the requestor
+     * manager's reconciliation job can fill gaps without blindly re-sending secrets.
+     *
+     * Deliberately presence-only: it returns the client ID (not a secret) and never the client
+     * secret, so polling it cannot be used to extract credentials.
+     */
+    @GetMapping("/{requestId}/credentials/status")
+    public ResponseEntity<?> getCredentialStatus(@PathVariable String requestId) {
+        var subOpt = subscriptionRepository.findByRequestId(requestId);
+        if (subOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of(
+                    "success", false, "message", "Unknown request ID: " + requestId));
+        }
+
+        AgreementSubscription sub = subOpt.get();
+        boolean hasCredentials = sub.getIntrospectionClientId() != null
+                && !sub.getIntrospectionClientId().isBlank()
+                && sub.getIntrospectionClientSecret() != null
+                && !sub.getIntrospectionClientSecret().isBlank();
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("success", true);
+        body.put("requestId", requestId);
+        body.put("status", sub.getStatus().name());
+        body.put("hasCredentials", hasCredentials);
+        body.put("hasIntrospectionUrl", sub.getIntrospectionUrl() != null && !sub.getIntrospectionUrl().isBlank());
+        body.put("clientId", hasCredentials ? sub.getIntrospectionClientId() : null);
+        return ResponseEntity.ok(body);
+    }
+
     // ==================== Data Holder Queries ====================
     /** A data holder's subscriptions, with full template/request-type/RDAP details. */
     @GetMapping("/dataholder/{dataholderId}/subscriptions")
@@ -384,7 +474,7 @@ public class ExternalController {
         if (dhId == null) return ResponseEntity.status(401).body(Map.of("error", "Invalid credentials"));
         List<AgreementSubscription> subs = subscriptionRepository
                 .findActiveAndEffectiveByDataholder(dhId, LocalDateTime.now());
-        return ResponseEntity.ok(subs.stream().map(mapper::toSubscriptionResponse).toList());
+        return ResponseEntity.ok(subs.stream().map(mapper::toSubscriptionResponseForDataHolder).toList());
     }
     /** Checks whether a requestor group has an active subscription. */
     @GetMapping("/my/subscriptions/check")
@@ -421,7 +511,7 @@ public class ExternalController {
         List<AgreementSubscription> subs = subscriptionRepository
                 .findActiveAndEffectiveByGroupCode(groupCode, LocalDateTime.now());
         if (subs.isEmpty()) return ResponseEntity.ok(List.of());
-        return ResponseEntity.ok(subs.stream().map(mapper::toSubscriptionResponse).toList());
+        return ResponseEntity.ok(subs.stream().map(mapper::toSubscriptionResponseForDataHolder).toList());
     }
 
     @GetMapping("/my/info")
@@ -734,10 +824,20 @@ public class ExternalController {
         private String requestorAgentId; private String requestorAgentUrl; private String callbackUrl;
         private String purpose; private String additionalTerms;
         private String introspectionUrl;
+        private String introspectionClientId; private String introspectionClientSecret;
     }
 
     @Data public static class WorkflowRequest {
         private String initiatedBy; private String notes;
+    }
+
+    /** Introspection credentials delivered by the requestor manager for a subscription. */
+    @Data public static class CredentialDeliveryRequest {
+        private String requestId;
+        private String clientId; private String clientSecret;
+        private String introspectionUrl; private String tokenUrl;
+        private String requestorGroupName; private String requestorGroupCode;
+        private String purpose; private String provisionedAt;
     }
 
     @Data public static class PingRequest {

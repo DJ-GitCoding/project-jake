@@ -152,13 +152,29 @@ public class AgreementSubscription {
     private String additionalTerms;
 
     /**
-     * Token introspection URL provided by the requestor group.
-     * Used as a fallback when no dedicated IntrospectionCredential exists
-     * for this subscription. Data holder uses this URL to validate bearer
-     * tokens on incoming RDAP queries from this requestor group.
+     * Token introspection URL provided by the requestor group. The data holder
+     * calls it to validate bearer tokens on incoming RDAP queries from this
+     * requestor group.
      */
     @Column(name = "introspection_url", length = 500)
     private String introspectionUrl;
+
+    /**
+     * Client ID the data holder authenticates with when calling
+     * {@link #introspectionUrl}. RFC 7662 §2.1 requires the introspection
+     * endpoint to authenticate its caller, so both this and the secret must be
+     * registered by the requestor group before its tokens can be validated.
+     */
+    @Column(name = "introspection_client_id", length = 255)
+    private String introspectionClientId;
+
+    /**
+     * Client secret paired with {@link #introspectionClientId}. Encrypted at
+     * rest by {@link com.jaddar.dataholder.config.EncryptedStringConverter}.
+     */
+    @Convert(converter = com.jaddar.dataholder.config.EncryptedStringConverter.class)
+    @Column(name = "introspection_client_secret", length = 512)
+    private String introspectionClientSecret;
 
     // ==================== Testing ====================
 

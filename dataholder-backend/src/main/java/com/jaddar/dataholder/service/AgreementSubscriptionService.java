@@ -155,6 +155,8 @@ public class AgreementSubscriptionService {
                 .purpose(request.getPurpose())
                 .additionalTerms(request.getAdditionalTerms())
                 .introspectionUrl(request.getIntrospectionUrl())
+                .introspectionClientId(request.getIntrospectionClientId())
+                .introspectionClientSecret(request.getIntrospectionClientSecret())
                 // Copy rate limits from template
                 .maxQueriesPerDay(template.getMaxQueriesPerDay())
                 .maxQueriesPerMonth(template.getMaxQueriesPerMonth())

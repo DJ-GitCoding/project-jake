@@ -18,6 +18,11 @@ spring:
         format_sql: true
     open-in-view: false
 
+  task:
+    scheduling:
+      pool:
+        size: ${TASK_SCHEDULING_POOL_SIZE:3}
+
 server:
   port: ${SERVER_PORT:8081}
 
@@ -70,6 +75,17 @@ subscription:
     # System identity recorded as the actor for automated transitions.
     actor: ${SUBSCRIPTION_AUTO_ADVANCE_ACTOR:system@auto-advance}
 
+  credential-sync:
+    enabled: ${SUBSCRIPTION_CREDENTIAL_SYNC_ENABLED:true}
+    # Offset from the top of the hour so it does not contend with the requestor-group sync.
+    cron: ${SUBSCRIPTION_CREDENTIAL_SYNC_CRON:0 30 * * * *}
+    # Also reconcile once shortly after startup, so a freshly-started stack self-heals instead of
+    # waiting for the next cron tick.
+    run-on-startup: ${SUBSCRIPTION_CREDENTIAL_SYNC_ON_STARTUP:true}
+    # Delay before the startup pass. Long enough for the group admin to start accepting requests —
+    # reconciliation skips subscriptions it cannot get an answer for, so running too early is a no-op.
+    startup-delay-seconds: ${SUBSCRIPTION_CREDENTIAL_SYNC_STARTUP_DELAY_SECONDS:60}
+
 # SendGrid (Twilio) email — password recovery
 sendgrid:
   api-key: ${SENDGRID_API_KEY:}
@@ -77,6 +93,13 @@ sendgrid:
   from-name: ${SENDGRID_FROM_NAME:Requestor Manager}
 
 # Password recovery
+# AES-256-GCM key material for encrypting sensitive columns at rest (per-subscription
+# introspection client secrets). Falls back to keycloak.client-secret so existing deployments keep
+# working, but set this explicitly: rotating the Keycloak client secret would otherwise leave stored
+# credentials undecryptable, forcing a re-provision. See EncryptedStringConverter.
+requestor-manager:
+  encryption-key: ${REQUESTOR_MANAGER_ENCRYPTION_KEY:}
+
 app:
   frontend-url: ${REQUESTOR_MANAGER_FRONTEND_URL:http://localhost:3000}
   password-reset:

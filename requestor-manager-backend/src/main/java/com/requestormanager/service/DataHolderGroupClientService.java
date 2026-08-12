@@ -629,6 +629,46 @@ public class DataHolderGroupClientService {
                 .build();
     }
 
+    /**
+     * Ask the data holder group whether a subscription already holds introspection credentials.
+     *
+     * GETs {dataHolderGroup.externalApiUrl}/{requestId}/credentials/status. The response reports
+     * presence only — it never carries a client secret — so this can be polled by the
+     * reconciliation job without moving secrets around.
+     *
+     * @return TRUE / FALSE when the group admin answered, or null when it could not be reached or
+     *         does not know the subscription. A null means "unknown", and callers must not treat it
+     *         as "missing" — re-sending credentials on an unknown state risks overwriting good ones.
+     */
+    public Boolean hasCredentials(Long dataHolderGroupId, String requestId) {
+        DataHolderGroup dataHolderGroup = dataHolderGroupRepository.findById(dataHolderGroupId)
+                .orElseThrow(() -> new RuntimeException("Data holder group not found: " + dataHolderGroupId));
+
+        String url = mtlsEndpoints.resolve(dataHolderGroup.getExternalApiUrl())
+                + "/" + requestId + "/credentials/status";
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url, HttpMethod.GET, new HttpEntity<>(createHeaders(dataHolderGroup)), String.class);
+
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                return null;
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> body = objectMapper.readValue(
+                    response.getBody(), new TypeReference<Map<String, Object>>() {});
+
+            Object hasCredentials = body.get("hasCredentials");
+            return hasCredentials instanceof Boolean b ? b : null;
+
+        } catch (Exception e) {
+            log.warn("Could not read credential status from {} for request {}: {}",
+                    dataHolderGroup.getCode(), requestId, e.getMessage());
+            return null;
+        }
+    }
+
     // ==================== Health Check Methods ====================
 
     /**
