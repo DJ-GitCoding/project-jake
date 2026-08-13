@@ -23,15 +23,16 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
 /**
- * Reconciles introspection credentials for active subscriptions against the data holder group.
+ * Repairs the two ways an active subscription's token introspection can be silently broken.
  *
  * A subscription whose credentials never reached the group admin cannot authenticate any RDAP
- * query — the data holder has no client to introspect with. That state is invisible from the
- * requestor's side and, before this job, needed a manual fix per subscription. This asks the group
- * admin which subscriptions are missing credentials and repairs only those.
+ * query — the data holder has no client to introspect with. A subscription whose Keycloak group
+ * never received the audience grant is worse: it looks entirely healthy, credentials and all, and
+ * Keycloak still reports every one of its tokens as inactive. Neither state is visible from the
+ * requestor's side and both, before this job, needed a manual fix per subscription.
  *
- * The job only ever fills gaps: anything the group admin already holds is left alone, and a
- * subscription whose state cannot be determined is skipped rather than guessed at. See
+ * The job only ever fills gaps: anything already in place is left alone, and a subscription whose
+ * state cannot be determined is skipped rather than guessed at. See
  * {@link SubscriptionCredentialService#reconcileMissingCredentials()} for the full safety rules.
  *
  * <p>Runs once shortly after startup and hourly thereafter, offset from the top of the hour so it
@@ -83,9 +84,12 @@ public class SubscriptionCredentialSyncScheduler {
     private void run(String trigger) {
         try {
             log.debug("Running {} introspection-credential reconciliation", trigger);
-            int repaired = credentialService.reconcileMissingCredentials();
-            if (repaired > 0) {
-                log.info("Credential reconciliation ({}) repaired {} subscription(s)", trigger, repaired);
+            SubscriptionCredentialService.ReconcileResult result =
+                    credentialService.reconcileMissingCredentials();
+            if (result.changedAnything()) {
+                log.info("Credential reconciliation ({}) repaired {} credential delivery/deliveries and "
+                                + "{} introspection audience grant(s)",
+                        trigger, result.credentialsRepaired(), result.audienceRepaired());
             }
         } catch (Exception e) {
             // Swallow so a transient group-admin outage doesn't kill the scheduler; next run retries.

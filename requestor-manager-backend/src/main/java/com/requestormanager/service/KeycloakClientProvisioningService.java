@@ -58,6 +58,19 @@ public class KeycloakClientProvisioningService {
     @Value("${keycloak.admin-password:admin}")
     private String adminPassword;
 
+    public enum AudienceState {
+        /** The grant was missing and has now been applied. */
+        GRANTED,
+        /** The group already carried the role; nothing was written. */
+        ALREADY_PRESENT,
+        /** No Keycloak client with that clientId; nothing to grant against. */
+        CLIENT_MISSING,
+        /** No Keycloak group with the requestor group's name; the group sync must run first. */
+        GROUP_MISSING,
+        /** Keycloak was unreachable or rejected the calls. */
+        FAILED
+    }
+
     /**
      * Result of provisioning a new Keycloak client.
      */
@@ -276,37 +289,97 @@ public class KeycloakClientProvisioningService {
      * introspection will be denied until this is repaired, because a silent gap here looks exactly
      * like a working subscription.
      */
-    private void grantIntrospectionAudience(String adminToken, String clientUuid, String clientId,
-                                            String requestorGroupName) {
+    private AudienceState grantIntrospectionAudience(String adminToken, String clientUuid, String clientId,
+                                                     String requestorGroupName) {
         try {
-            ensureClientRole(adminToken, clientUuid, clientId);
-
-            Map<String, Object> role = getClientRole(adminToken, clientUuid);
-            if (role == null) {
-                log.error("Could not read the '{}' role on client '{}' — introspection will be DENIED by "
-                        + "Keycloak until this client is in the token audience.", INTROSPECTION_ROLE, clientId);
-                return;
-            }
-
             String groupId = findGroupIdByName(adminToken, requestorGroupName);
             if (groupId == null) {
                 log.error("No Keycloak group named '{}' for client '{}' — introspection will be DENIED by "
                                 + "Keycloak until this client is in the token audience. The requestor group "
                                 + "must exist in Keycloak (see the requestor-group sync).",
                         requestorGroupName, clientId);
-                return;
+                return AudienceState.GROUP_MISSING;
+            }
+
+            if (groupHasIntrospectionRole(adminToken, groupId, clientUuid)) {
+                log.debug("Group '{}' already carries '{}' on client '{}'",
+                        requestorGroupName, INTROSPECTION_ROLE, clientId);
+                return AudienceState.ALREADY_PRESENT;
+            }
+
+            ensureClientRole(adminToken, clientUuid, clientId);
+
+            Map<String, Object> role = getClientRole(adminToken, clientUuid);
+            if (role == null) {
+                log.error("Could not read the '{}' role on client '{}' — introspection will be DENIED by "
+                        + "Keycloak until this client is in the token audience.", INTROSPECTION_ROLE, clientId);
+                return AudienceState.FAILED;
             }
 
             assignClientRoleToGroup(adminToken, groupId, clientUuid, role);
 
             log.info("Granted '{}' on client '{}' to Keycloak group '{}' — that group's tokens now carry "
                     + "this client in their audience", INTROSPECTION_ROLE, clientId, requestorGroupName);
+            return AudienceState.GRANTED;
 
         } catch (Exception e) {
             log.error("Failed to grant the introspection audience for client '{}' (group '{}'): {}. "
                             + "Introspection will be DENIED by Keycloak until this client is in the token audience.",
                     clientId, requestorGroupName, e.getMessage());
+            return AudienceState.FAILED;
         }
+    }
+
+    /**
+     * Assert the introspection audience grant for an already-provisioned client, by clientId.
+     */
+    public AudienceState ensureIntrospectionAudience(String clientId, String requestorGroupName) {
+        if (clientId == null || clientId.isBlank()) {
+            return AudienceState.CLIENT_MISSING;
+        }
+
+        String adminToken;
+        try {
+            adminToken = getAdminToken();
+        } catch (Exception e) {
+            log.warn("Could not obtain a Keycloak admin token to verify the introspection audience "
+                    + "for client '{}': {}", clientId, e.getMessage());
+            return AudienceState.FAILED;
+        }
+
+        String clientUuid = findClientUuid(adminToken, clientId);
+        if (clientUuid == null) {
+            log.warn("No Keycloak client '{}' — cannot grant the introspection audience. The "
+                    + "subscription's credentials refer to a client that no longer exists.", clientId);
+            return AudienceState.CLIENT_MISSING;
+        }
+
+        return grantIntrospectionAudience(adminToken, clientUuid, clientId, requestorGroupName);
+    }
+
+    /**
+     * Whether the group already has the introspection role for this client.
+     */
+    @SuppressWarnings("unchecked")
+    private boolean groupHasIntrospectionRole(String adminToken, String groupId, String clientUuid) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(adminToken);
+        try {
+            ResponseEntity<List> response = restTemplate.exchange(
+                    adminUrl + "/groups/" + groupId + "/role-mappings/clients/" + clientUuid,
+                    HttpMethod.GET, new HttpEntity<>(headers), List.class);
+
+            if (response.getBody() == null) return false;
+            for (Object item : response.getBody()) {
+                if (item instanceof Map<?, ?> role && INTROSPECTION_ROLE.equals(role.get("name"))) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Could not read role mappings for group {} on client {}: {}",
+                    groupId, clientUuid, e.getMessage());
+        }
+        return false;
     }
 
     /** Create the introspection role on the client. An existing role (409) is success. */

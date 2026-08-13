@@ -14,6 +14,7 @@ import com.requestormanager.entity.SubscriptionRequest;
 import com.requestormanager.entity.SubscriptionRequest.SubscriptionStatus;
 import com.requestormanager.repository.SubscriptionCredentialRepository;
 import com.requestormanager.repository.SubscriptionRequestRepository;
+import com.requestormanager.service.KeycloakClientProvisioningService.AudienceState;
 import com.requestormanager.service.KeycloakClientProvisioningService.ProvisionedClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -165,24 +166,30 @@ public class SubscriptionCredentialService {
         return retried;
     }
 
+    /** What a reconciliation pass actually changed. */
+    public record ReconcileResult(int credentialsRepaired, int audienceRepaired) {
+        public boolean changedAnything() {
+            return credentialsRepaired > 0 || audienceRepaired > 0;
+        }
+    }
+
     /**
-     * Reconcile subscriptions whose introspection credentials never reached the data holder group.
-     *
-     * Subscriptions activated before credential delivery worked have no credentials at the group
-     * admin, so every RDAP query from them fails authentication. This fills those gaps without any
-     * manual step.
-     *
-     * @return the number of subscriptions whose credentials were repaired
+     * Reconcile active subscriptions whose introspection is broken, in either of the two ways it can be.
      */
     @Transactional
-    public int reconcileMissingCredentials() {
+    public ReconcileResult reconcileMissingCredentials() {
         List<SubscriptionRequest> active =
                 subscriptionRequestRepository.findByStatus(SubscriptionStatus.ACTIVE);
         int repaired = 0;
+        int audienceRepaired = 0;
 
         log.info("Credential reconciliation: checking {} active subscription(s)", active.size());
 
         for (SubscriptionRequest sub : active) {
+            if (assertIntrospectionAudience(sub) == AudienceState.GRANTED) {
+                audienceRepaired++;
+            }
+
             if (sub.getDataHolderGroup() == null || sub.getExternalRequestId() == null) {
                 log.warn("Credential reconciliation: subscription {} has no {} — skipping",
                         sub.getInternalRequestId(),
@@ -243,10 +250,38 @@ public class SubscriptionCredentialService {
             }
         }
 
-        if (repaired > 0) {
-            log.info("Credential reconciliation: repaired {} subscription(s)", repaired);
+        if (repaired > 0 || audienceRepaired > 0) {
+            log.info("Credential reconciliation: repaired credential delivery for {} subscription(s) "
+                    + "and the introspection audience for {}", repaired, audienceRepaired);
         }
-        return repaired;
+        return new ReconcileResult(repaired, audienceRepaired);
+    }
+
+    /**
+     * Re-assert the Keycloak audience grant for a subscription's existing introspection client.
+     */
+    private AudienceState assertIntrospectionAudience(SubscriptionRequest sub) {
+        SubscriptionCredential credential =
+                credentialRepository.findBySubscriptionRequestId(sub.getId()).orElse(null);
+
+        if (credential == null || !Boolean.TRUE.equals(credential.getIsActive())) {
+            return AudienceState.CLIENT_MISSING;
+        }
+        if (sub.getRequestorGroup() == null) {
+            log.warn("Credential reconciliation: subscription {} has no requestor group — cannot verify "
+                    + "its introspection audience", sub.getInternalRequestId());
+            return AudienceState.GROUP_MISSING;
+        }
+
+        AudienceState state = keycloakService.ensureIntrospectionAudience(
+                credential.getKeycloakClientId(), sub.getRequestorGroup().getName());
+
+        if (state == AudienceState.GRANTED) {
+            log.info("Credential reconciliation: restored the introspection audience for subscription {} "
+                            + "(group {}) — tokens for this group were being rejected as inactive",
+                    sub.getInternalRequestId(), sub.getRequestorGroup().getName());
+        }
+        return state;
     }
 
     /**
