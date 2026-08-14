@@ -21,7 +21,9 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -458,15 +460,46 @@ public class TokenIntrospectionService {
                     );
                 }
 
-                log.debug("Token reported as not active by the introspection endpoint for group '{}'", groupCode);
+                log.warn("Introspection declined the token for group '{}': endpoint={} client={} token[{}] response={}",
+                        groupCode, endpoint.url(), endpoint.clientId(), describeToken(token), response.getBody());
             } else {
-                log.warn("Introspection endpoint for group '{}' returned {}", groupCode, response.getStatusCode());
+                log.warn("Introspection endpoint for group '{}' returned {} (endpoint={} client={}): {}",
+                        groupCode, response.getStatusCode(), endpoint.url(), endpoint.clientId(), response.getBody());
             }
         } catch (Exception e) {
-            log.error("Introspection call failed for group '{}': {}", groupCode, e.getMessage());
+            log.error("Introspection call failed for group '{}' (endpoint={} client={} token[{}]): {}",
+                    groupCode, endpoint.url(), endpoint.clientId(), describeToken(token), e.getMessage());
         }
 
         return IntrospectionResult.inactive();
+    }
+
+    /**
+     * Bearer token diagnostics...
+     */
+    private String describeToken(String token) {
+        if (token == null || token.isBlank()) {
+            return "absent";
+        }
+        String[] parts = token.split("\\.");
+        if (parts.length < 2) {
+            return "not a JWT, length=" + token.length();
+        }
+        try {
+            String payload = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
+            Map<String, Object> claims = objectMapper.readValue(payload, new TypeReference<>() {});
+
+            Object exp = claims.get("exp");
+            String expiry = exp instanceof Number n
+                    ? n.longValue() + (n.longValue() * 1000 < System.currentTimeMillis() ? " (EXPIRED)" : " (valid)")
+                    : "none";
+
+            return String.format("typ=%s iss=%s azp=%s sub=%s sid=%s exp=%s",
+                    claims.get("typ"), claims.get("iss"), claims.get("azp"),
+                    claims.get("sub"), claims.get("sid"), expiry);
+        } catch (Exception e) {
+            return "undecodable JWT payload: " + e.getMessage();
+        }
     }
 
     /**
