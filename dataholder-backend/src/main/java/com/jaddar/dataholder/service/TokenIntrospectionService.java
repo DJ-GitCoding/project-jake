@@ -110,9 +110,10 @@ public class TokenIntrospectionService {
                 "holder group to have them re-issued for your subscription."),
 
         GROUP_MISMATCH(
-                "Your access token is valid but is not associated with the requestor group " +
-                "for this subscription. Please sign in with an account belonging to that group, " +
-                "or contact the data holder group if you believe your account should have access."),
+                "Your access token is valid but does not carry the requestor group this " +
+                "subscription is bound to. If your group was renamed after the subscription " +
+                "was approved, ask the data holder group to refresh the subscription's group " +
+                "binding; otherwise sign in with an account belonging to that group."),
 
         TOKEN_REJECTED(
                 "Your access token could not be validated. It may have expired or been issued " +

@@ -197,6 +197,8 @@ public class SubscriptionCredentialService {
                 continue;
             }
 
+            syncRequestorGroupBinding(sub);
+
             Boolean present;
             try {
                 present = dataHolderGroupClientService.hasCredentials(
@@ -255,6 +257,21 @@ public class SubscriptionCredentialService {
                     + "and the introspection audience for {}", repaired, audienceRepaired);
         }
         return new ReconcileResult(repaired, audienceRepaired);
+    }
+
+    /**
+     * Re-assert the subscription's requestor group identifiers on the group admin.
+     */
+    private void syncRequestorGroupBinding(SubscriptionRequest sub) {
+        if (sub.getRequestorGroup() == null) {
+            return;
+        }
+        if (dataHolderGroupClientService.syncRequestorGroup(
+                sub.getDataHolderGroup().getId(), sub.getExternalRequestId(),
+                sub.getRequestorGroup().getCode(), sub.getRequestorGroup().getName())) {
+            log.info("Credential reconciliation: refreshed requestor group binding for subscription {} to '{}'",
+                    sub.getInternalRequestId(), sub.getRequestorGroup().getCode());
+        }
     }
 
     /**

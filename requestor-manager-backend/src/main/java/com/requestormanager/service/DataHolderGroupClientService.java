@@ -630,6 +630,44 @@ public class DataHolderGroupClientService {
     }
 
     /**
+     * Re-assert a subscription's requestor group identifiers on the group admin, returning
+     * whether they had drifted. The group admin records them when the subscription is initiated
+     * and never revisits them, so a group renamed afterwards leaves data holders matching bearer
+     * tokens against an identifier no token carries.
+     *
+     * POSTs to: {dataHolderGroup.externalApiUrl}/{requestId}/requestor-group
+     */
+    public boolean syncRequestorGroup(Long dataHolderGroupId, String requestId, String code, String name) {
+        DataHolderGroup dataHolderGroup = dataHolderGroupRepository.findById(dataHolderGroupId)
+                .orElseThrow(() -> new RuntimeException("Data holder group not found: " + dataHolderGroupId));
+
+        String url = mtlsEndpoints.resolve(dataHolderGroup.getExternalApiUrl())
+                + "/" + requestId + "/requestor-group";
+
+        try {
+            HttpHeaders headers = createHeaders(dataHolderGroup);
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url, HttpMethod.POST,
+                    new HttpEntity<>(Map.of("code", code, "name", name != null ? name : ""), headers),
+                    String.class);
+
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                return false;
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> body = objectMapper.readValue(
+                    response.getBody(), new TypeReference<Map<String, Object>>() {});
+            return Boolean.TRUE.equals(body.get("updated"));
+
+        } catch (Exception e) {
+            log.warn("Could not sync requestor group binding for {} at {}: {}", requestId, url, e.getMessage());
+            return false;
+        }
+    }
+    /**
      * Ask the data holder group whether a subscription already holds introspection credentials.
      *
      * GETs {dataHolderGroup.externalApiUrl}/{requestId}/credentials/status. The response reports

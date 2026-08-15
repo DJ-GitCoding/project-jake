@@ -316,6 +316,9 @@ public class ExternalController {
                             + "already registers {} — keeping the registered one",
                     requestId, request.getIntrospectionUrl(), sub.getIntrospectionUrl());
         }
+
+        applyRequestorGroup(sub, request.getRequestorGroupCode(), request.getRequestorGroupName(), requestId);
+
         subscriptionRepository.save(sub);
 
         audit.logApi("RECEIVE_CREDENTIALS", "SUBSCRIPTION", requestId,
@@ -329,6 +332,60 @@ public class ExternalController {
                 "success", true,
                 "requestId", requestId,
                 "message", "Introspection credentials stored"));
+    }
+
+    /**
+     * Refreshes the requestor group identifiers recorded on a subscription.
+     */
+    @PostMapping("/{requestId}/requestor-group")
+    @Transactional
+    public ResponseEntity<?> syncRequestorGroup(@PathVariable String requestId,
+                                                @RequestBody RequestorGroupSyncRequest request) {
+        var subOpt = subscriptionRepository.findByRequestId(requestId);
+        if (subOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of(
+                    "success", false, "message", "Unknown request ID: " + requestId));
+        }
+        if (!notBlank(request.getCode())) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false, "message", "code is required"));
+        }
+
+        AgreementSubscription sub = subOpt.get();
+        boolean updated = applyRequestorGroup(sub, request.getCode(), request.getName(), requestId);
+        if (updated) {
+            subscriptionRepository.save(sub);
+            audit.logApi("SYNC_REQUESTOR_GROUP", "SUBSCRIPTION", requestId,
+                    sub.getRequestorGroupName(), "EXTERNAL", AuditService.SRC_EXTERNAL,
+                    "Refreshed requestor group binding to " + request.getCode());
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "success", true, "requestId", requestId, "updated", updated));
+    }
+
+    /**
+     * Apply the requestor manager's current group identifiers to a subscription, reporting
+     * whether anything actually changed. Blank values are ignored rather than clearing a
+     * binding that is still good.
+     */
+    private boolean applyRequestorGroup(AgreementSubscription sub, String code, String name, String requestId) {
+        boolean changed = false;
+        if (notBlank(code) && !code.equals(sub.getRequestorGroupCode())) {
+            log.info("Subscription {}: requestor group code '{}' -> '{}'",
+                    requestId, sub.getRequestorGroupCode(), code);
+            sub.setRequestorGroupCode(code);
+            changed = true;
+        }
+        if (notBlank(name) && !name.equals(sub.getRequestorGroupName())) {
+            sub.setRequestorGroupName(name);
+            changed = true;
+        }
+        return changed;
+    }
+
+    private static boolean notBlank(String s) {
+        return s != null && !s.isBlank();
     }
 
     /**
@@ -838,6 +895,10 @@ public class ExternalController {
         private String introspectionUrl; private String tokenUrl;
         private String requestorGroupName; private String requestorGroupCode;
         private String purpose; private String provisionedAt;
+    }
+
+    @Data public static class RequestorGroupSyncRequest {
+        private String code; private String name;
     }
 
     @Data public static class PingRequest {
