@@ -8,21 +8,31 @@
 
 package com.requestormanager.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.requestormanager.dto.ApiResponse;
+import com.requestormanager.enums.UserType;
 import com.requestormanager.security.JwtAuthenticationFilter;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
@@ -33,6 +43,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ObjectMapper objectMapper;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -60,9 +71,41 @@ public class SecurityConfig {
                 // All other endpoints require authentication
                 .anyRequest().authenticated()
             )
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint(this::writeUnauthenticated)
+                .accessDeniedHandler(this::writeAccessDenied)
+            )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    /** No usable credentials on the request (missing, malformed, or expired token). */
+    private void writeUnauthenticated(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            AuthenticationException ex
+    ) throws IOException {
+        writeError(response, HttpStatus.UNAUTHORIZED, "Your session has expired. Please sign in again.");
+    }
+
+    /** Authenticated, but the account lacks the role this endpoint requires. */
+    private void writeAccessDenied(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            AccessDeniedException ex
+    ) throws IOException {
+        writeError(response, HttpStatus.FORBIDDEN, "You do not have permission to perform this action.");
+    }
+
+    private void writeError(HttpServletResponse response, HttpStatus status, String message) throws IOException {
+        if (response.isCommitted()) {
+            return;
+        }
+        response.setStatus(status.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        objectMapper.writeValue(response.getWriter(), ApiResponse.error(message));
     }
 
     @Bean

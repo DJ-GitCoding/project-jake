@@ -9,6 +9,7 @@
 import { createSessionStorage } from "react-router";
 import { randomBytes } from "node:crypto";
 import { encrypt, decrypt } from "./crypto.server.js";
+import { createStore } from "./session-store.server.js";
 
 const secret = process.env.SESSION_SECRET;
 if (!secret) {
@@ -16,24 +17,23 @@ if (!secret) {
 }
 const secrets = secret.split(",").map((s) => s.trim()).filter(Boolean);
 
-const MAX_AGE_MS = 8 * 60 * 60 * 1000; // 8 hours
+const num = (envVar, fallback) => {
+  const parsed = Number(process.env[envVar]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const IDLE_MS = num("SESSION_IDLE_MINUTES", 15) * 60 * 1000;
+const MAX_AGE_MS = num("SESSION_MAX_HOURS", 8) * 60 * 60 * 1000;
 
 /*
- * Server-side session store. The cookie holds only a signed httpOnly session id;
- * the Keycloak JWTs (access + id + refresh) live here in this Map. Kept on
- * globalThis to survive Vite dev reloads; lost on process restart. For
- * multi-replica prod, swap this Map for a shared store (Redis/Postgres).
+ * Server-side session store. The cookie holds only a signed httpOnly session id; the
+ * JWTs live in the store (AES-encrypted at rest) and never reach the browser. Backed by
+ * Postgres when SESSION_DATABASE_URL is set, otherwise an in-process Map -- see
+ * session-store.server.js.
  */
-const store = (globalThis.__jaddarSessionStore ||= new Map());
+const store = createStore({ app: "jaddar" });
 
-function sweep() {
-  const now = Date.now();
-  for (const [id, rec] of store) {
-    if (rec.expiresAt && rec.expiresAt < now) store.delete(id);
-  }
-}
-
-function expiryMs(expires) {
+function absoluteExpiryMs(expires) {
   return expires ? expires.getTime() : Date.now() + MAX_AGE_MS;
 }
 
@@ -51,25 +51,18 @@ export const sessionStorage = createSessionStorage({
     let id;
     do {
       id = randomBytes(18).toString("hex");
-    } while (store.has(id));
-    store.set(id, { data, expiresAt: expiryMs(expires) });
-    if (store.size % 200 === 0) sweep();
+    } while (await store.has(id));
+    await store.create(id, data, Date.now() + IDLE_MS, absoluteExpiryMs(expires));
     return id;
   },
   async readData(id) {
-    const rec = store.get(id);
-    if (!rec) return null;
-    if (rec.expiresAt && rec.expiresAt < Date.now()) {
-      store.delete(id);
-      return null;
-    }
-    return rec.data;
+    return await store.readAndTouch(id, Date.now() + IDLE_MS);
   },
   async updateData(id, data, expires) {
-    store.set(id, { data, expiresAt: expiryMs(expires) });
+    await store.update(id, data, Date.now() + IDLE_MS, absoluteExpiryMs(expires));
   },
   async deleteData(id) {
-    store.delete(id);
+    await store.destroy(id);
   },
 });
 

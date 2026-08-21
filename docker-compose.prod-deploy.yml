@@ -56,6 +56,9 @@ services:
       - JADDAR_CLIENT_SECRET=${JADDAR_CLIENT_SECRET}
       - JADDAR_REDIRECT_URI=${JADDAR_REDIRECT_URI}
       - JADDAR_WEB_ORIGIN=${JADDAR_WEB_ORIGIN}
+      - KEYCLOAK_SSO_IDLE_SECONDS=${KEYCLOAK_SSO_IDLE_SECONDS:-900}
+      - KEYCLOAK_SSO_MAX_SECONDS=${KEYCLOAK_SSO_MAX_SECONDS:-36000}
+      - KEYCLOAK_ACCESS_TOKEN_SECONDS=${KEYCLOAK_ACCESS_TOKEN_SECONDS:-300}
     command: |
       sh -c '
       apk add --no-cache curl jq &&
@@ -80,24 +83,35 @@ services:
         -H "Content-Type: application/json") &&
       
       CURRENT_SSO_IDLE=$$(echo "$$REALM_CONFIG" | jq -r ".ssoSessionIdleTimeout") &&
+      CURRENT_ACCESS_LIFESPAN=$$(echo "$$REALM_CONFIG" | jq -r ".accessTokenLifespan") &&
       echo "Current SSO Session Idle Timeout: $$CURRENT_SSO_IDLE seconds" &&
+      echo "Current Access Token Lifespan: $$CURRENT_ACCESS_LIFESPAN seconds" &&
+      echo "Desired: idle=$$KEYCLOAK_SSO_IDLE_SECONDS access=$$KEYCLOAK_ACCESS_TOKEN_SECONDS" &&
       
-      if [ "$$CURRENT_SSO_IDLE" != "1800" ]; then
-        echo "Updating session timeouts to 30 minutes..." &&
+      # This used to be guarded on ssoSessionIdleTimeout alone. The master realm ships
+      # with ssoSessionIdleTimeout=1800 already, so the old "!= 1800" test was never
+      # true on a fresh Keycloak and the PUT never ran -- leaving accessTokenLifespan at
+      # the master-realm default of 60s. Compare every value we care about instead.
+      if [ "$$CURRENT_SSO_IDLE" != "$$KEYCLOAK_SSO_IDLE_SECONDS" ] || \
+         [ "$$CURRENT_ACCESS_LIFESPAN" != "$$KEYCLOAK_ACCESS_TOKEN_SECONDS" ]; then
+        echo "Updating realm session timeouts..." &&
         curl -s -X PUT "http://keycloak:8080/admin/realms/master" \
           -H "Authorization: Bearer $$TOKEN" \
           -H "Content-Type: application/json" \
           -d "{
-            \"ssoSessionIdleTimeout\": 1800,
-            \"ssoSessionMaxLifespan\": 36000,
-            \"accessTokenLifespan\": 1800,
-            \"accessTokenLifespanForImplicitFlow\": 1800,
+            \"ssoSessionIdleTimeout\": $$KEYCLOAK_SSO_IDLE_SECONDS,
+            \"ssoSessionMaxLifespan\": $$KEYCLOAK_SSO_MAX_SECONDS,
+            \"accessTokenLifespan\": $$KEYCLOAK_ACCESS_TOKEN_SECONDS,
+            \"accessTokenLifespanForImplicitFlow\": $$KEYCLOAK_ACCESS_TOKEN_SECONDS,
             \"offlineSessionIdleTimeout\": 2592000,
             \"offlineSessionMaxLifespan\": 5184000
           }" &&
+        VERIFY=$$(curl -s -X GET "http://keycloak:8080/admin/realms/master" \
+          -H "Authorization: Bearer $$TOKEN") &&
+        echo "Applied: idle=$$(echo "$$VERIFY" | jq -r .ssoSessionIdleTimeout)s access=$$(echo "$$VERIFY" | jq -r .accessTokenLifespan)s" &&
         echo "Session timeouts updated successfully!"
       else
-        echo "Session timeouts already configured to 30 minutes, skipping."
+        echo "Session timeouts already correct, skipping."
       fi &&
       
       echo "===== ENABLING KEYCLOAK EVENTS =====" &&
@@ -435,9 +449,22 @@ services:
     environment:
       - REACT_APP_API_URL=${REQUESTOR_MANAGER_FRONTEND_API_URL}
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
+      - SESSION_IDLE_MINUTES=${SESSION_IDLE_MINUTES:-15}
+      - SESSION_MAX_HOURS=${SESSION_MAX_HOURS:-8}
+      - SESSION_DB_HOST=postgres
+      - SESSION_DB_PORT=5432
+      - SESSION_DB_NAME=sessions_db
+      - SESSION_DB_USER=${POSTGRES_USER}
+      - SESSION_DB_PASSWORD=${POSTGRES_PASSWORD}
+      - SESSION_DATABASE_CA=/certs/infra-ca.crt
       - SOURCE_CODE_URL=${SOURCE_CODE_URL:-}
     depends_on:
-      - requestor-manager-backend
+      requestor-manager-backend:
+        condition: service_started
+      postgres-setup:
+        condition: service_completed_successfully
+    volumes:
+      - ./certs:/certs:ro
     networks:
       - app-network
 
@@ -572,9 +599,22 @@ services:
       - REACT_APP_DATAHOLDER_URL=${DATAHOLDER_URL:-http://dataholder-backend:8082}
       - REACT_APP_VERSION=${REACT_APP_VERSION:-1.0.9}
       - SESSION_SECRET=${SESSION_SECRET:?SESSION_SECRET must be set}
+      - SESSION_IDLE_MINUTES=${SESSION_IDLE_MINUTES:-15}
+      - SESSION_MAX_HOURS=${SESSION_MAX_HOURS:-8}
+      - SESSION_DB_HOST=postgres
+      - SESSION_DB_PORT=5432
+      - SESSION_DB_NAME=sessions_db
+      - SESSION_DB_USER=${POSTGRES_USER}
+      - SESSION_DB_PASSWORD=${POSTGRES_PASSWORD}
+      - SESSION_DATABASE_CA=/certs/infra-ca.crt
       - SOURCE_CODE_URL=${SOURCE_CODE_URL:-}
     depends_on:
-      - jaddar-backend
+      jaddar-backend:
+        condition: service_started
+      postgres-setup:
+        condition: service_completed_successfully
+    volumes:
+      - ./certs:/certs:ro
     networks:
       - app-network
 
@@ -758,6 +798,11 @@ services:
         "SELECT 1 FROM pg_database WHERE datname = '"'"'dhgroupadmin_db'"'"'" | grep -q 1 || \
         psql -h postgres -U $$POSTGRES_USER -d postgres -c "CREATE DATABASE dhgroupadmin_db;" &&
       echo "✓ dhgroupadmin_db ready" &&
+      
+      psql -h postgres -U $$POSTGRES_USER -d postgres -tc \
+        "SELECT 1 FROM pg_database WHERE datname = '"'"'sessions_db'"'"'" | grep -q 1 || \
+        psql -h postgres -U $$POSTGRES_USER -d postgres -c "CREATE DATABASE sessions_db;" &&
+      echo "✓ sessions_db ready" &&
       
       echo "===== ALL DATABASES READY ====="
       '
