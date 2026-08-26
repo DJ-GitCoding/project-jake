@@ -47,8 +47,14 @@ public class RdapRedactionService {
             "rdapConformance", "objectClassName", "notices", "remarks",
             "links", "timestamp", "accessLevel", "agreementNames",
             "errorCode", "title", "description", "pollUrl", "requestId",
-            "status_code", "lang"
+            "status_code", "lang", "policyLevels"
     );
+
+    /**
+     * Response key carrying the per-element policy levels. Present on the
+     * top-level object and on each child entity, alongside the data it describes.
+     */
+    private static final String POLICY_LEVELS_KEY = "policyLevels";
 
     /**
      * Apply redaction to all data fields in the RDAP response.
@@ -57,9 +63,10 @@ public class RdapRedactionService {
         PolicyExpression policy = resolvePolicy(rdapResponse, entity);
         int defaultSensitivity = 0;
 
-        // Build per-field sensitivity lookup from the policy's redaction rules
+        // Build per-field rule lookup from the policy's redaction rules
         RdapObjectType objectType = mapEntityType(entity.getObjectType());
-        Map<String, Integer> fieldSensitivity = buildFieldSensitivityMap(policy, objectType);
+        Map<String, List<PolicyRedactionRule>> fieldRules = buildFieldRuleMap(policy, objectType);
+        Map<String, Integer> fieldSensitivity = maxSensitivityByField(fieldRules);
 
         if (policy != null) {
             log.info("POLICY RESOLVED: '{}' (id={}) for entity {} — defaultSensitivity={}, fieldRules={}",
@@ -70,17 +77,19 @@ public class RdapRedactionService {
 
         Map<String, Object> result = new LinkedHashMap<>(rdapResponse);
         List<String> redactedFields = new ArrayList<>();
+        Map<String, Object> topFieldLevels = new LinkedHashMap<>();
 
         // Redact top-level fields
         for (String key : new ArrayList<>(result.keySet())) {
             if (META_FIELDS.contains(key) || "entities".equals(key)) continue;
             Object value = result.get(key);
             int sens = fieldSensitivity.getOrDefault(key, defaultSensitivity);
+            topFieldLevels.put(key, describeLevels(fieldRules.get(key), defaultSensitivity));
             applyRedaction(result, key, value, accessLevel, sens, redactedFields);
         }
 
         // Redact child entities
-        redactChildEntities(result, accessLevel, defaultSensitivity, fieldSensitivity, policy, redactedFields);
+        redactChildEntities(result, accessLevel, defaultSensitivity, policy, redactedFields);
 
         if (!redactedFields.isEmpty()) {
             addRedactionNotice(result, redactedFields, policy != null ? policy.getName() : null);
@@ -94,34 +103,56 @@ public class RdapRedactionService {
         // Always include the resolved policy name in the response
         if (policy != null) {
             result.put("policyName", policy.getName());
+            result.put(POLICY_LEVELS_KEY,
+                    buildPolicyLevelsBlock(policy, accessLevel, defaultSensitivity, topFieldLevels));
         }
 
         return result;
     }
 
     /**
-     * Build a map of fieldPath → sensitivityLevel from the policy's enabled rules
-     * that apply to the given object type (or ALL).
+     * Assemble the top-level policy levels block. Child entities carry their own
+     * block so that per-role levels stay attached to the contact they describe.
+     */
+    private Map<String, Object> buildPolicyLevelsBlock(PolicyExpression policy, int accessLevel,
+                                                       int defaultSensitivity, Map<String, Object> fieldLevels) {
+        Map<String, Object> block = new LinkedHashMap<>();
+        block.put("policyName", policy.getName());
+        block.put("accessLevel", accessLevel);
+        block.put("defaultSensitivityLevel", defaultSensitivity);
+        block.put("fields", fieldLevels);
+        return block;
+    }
+
+    /**
+     * Build a map of lookupKey → contributing rules from the policy's enabled
+     * rules that apply to the given object type (or ALL).
      *
      * Imported policy rules use structured paths like "registrant.fn" or
      * "registrant.adr.street1".  These must be translated into the lookup
      * keys that the redaction code actually uses when iterating the RDAP
      * response (top-level map keys such as "ldhName" and vCard keys such
      * as "vcardArray.fn").
+     *
+     * Several rules can land on the same key — the Int'l and Local variants of
+     * a name both translate to "vcardArray.fn", and every address component
+     * translates to "vcardArray.adr" — so the rules are kept as a list rather
+     * than collapsed on the way in. Redaction uses the highest sensitivity
+     * among them (see {@link #maxSensitivity}); the full list is what lets the
+     * response report every level that was associated with the element.
      */
-    private Map<String, Integer> buildFieldSensitivityMap(PolicyExpression policy, RdapObjectType objectType) {
-        Map<String, Integer> map = new LinkedHashMap<>();
+    private Map<String, List<PolicyRedactionRule>> buildFieldRuleMap(PolicyExpression policy,
+                                                                     RdapObjectType objectType) {
+        Map<String, List<PolicyRedactionRule>> map = new LinkedHashMap<>();
         if (policy == null || policy.getRedactionRules() == null) return map;
 
         policy.getRedactionRules().stream()
                 .filter(r -> Boolean.TRUE.equals(r.getIsEnabled()))
                 .filter(r -> r.getObjectType() == objectType || r.getObjectType() == RdapObjectType.ALL)
                 .forEach(r -> {
-                    int sens = r.getSensitivityLevel() != null ? r.getSensitivityLevel() : 0;
-                    String path = r.getFieldPath();
                     // Translate dotted policy paths to the keys the redaction loop uses
-                    for (String key : translatePolicyPath(path)) {
-                        map.merge(key, sens, Math::max);
+                    for (String key : translatePolicyPath(r.getFieldPath())) {
+                        map.computeIfAbsent(key, k -> new ArrayList<>()).add(r);
                     }
                 });
 
@@ -129,28 +160,133 @@ public class RdapRedactionService {
     }
 
     /**
-     * Build a role-aware sensitivity map for ENTITY redaction rules.
-     * Returns  role → { lookupKey → sensitivityLevel }.
+     * Build a role-aware rule map for ENTITY redaction rules.
+     * Returns  role → { lookupKey → contributing rules }.
      * A rule with no recognised role prefix (or objectType ALL) is filed under "*".
      */
-    private Map<String, Map<String, Integer>> buildRoleSensitivityMap(PolicyExpression policy) {
-        Map<String, Map<String, Integer>> roleMap = new LinkedHashMap<>();
+    private Map<String, Map<String, List<PolicyRedactionRule>>> buildRoleRuleMap(PolicyExpression policy) {
+        Map<String, Map<String, List<PolicyRedactionRule>>> roleMap = new LinkedHashMap<>();
         if (policy == null || policy.getRedactionRules() == null) return roleMap;
 
         policy.getRedactionRules().stream()
                 .filter(r -> Boolean.TRUE.equals(r.getIsEnabled()))
                 .filter(r -> r.getObjectType() == RdapObjectType.ENTITY || r.getObjectType() == RdapObjectType.ALL)
                 .forEach(r -> {
-                    int sens = r.getSensitivityLevel() != null ? r.getSensitivityLevel() : 0;
-                    String path = r.getFieldPath();
-                    String role = extractRole(path);
-                    Map<String, Integer> roleBucket = roleMap.computeIfAbsent(role, k -> new LinkedHashMap<>());
-                    for (String key : translatePolicyPath(path)) {
-                        roleBucket.merge(key, sens, Math::max);
+                    Map<String, List<PolicyRedactionRule>> roleBucket =
+                            roleMap.computeIfAbsent(extractRole(r.getFieldPath()), k -> new LinkedHashMap<>());
+                    for (String key : translatePolicyPath(r.getFieldPath())) {
+                        roleBucket.computeIfAbsent(key, k -> new ArrayList<>()).add(r);
                     }
                 });
 
         return roleMap;
+    }
+
+    /** Collapse a rule map to the sensitivity level that actually governs each key. */
+    private Map<String, Integer> maxSensitivityByField(Map<String, List<PolicyRedactionRule>> ruleMap) {
+        Map<String, Integer> map = new LinkedHashMap<>();
+        ruleMap.forEach((key, rules) -> map.put(key, maxSensitivity(rules, 0)));
+        return map;
+    }
+
+    /**
+     * The sensitivity level that governs a data element: the highest among all
+     * rules that translate to it, so the most restrictive rule wins. Where a
+     * policy sets different levels for the Int'l and Local forms of a field,
+     * this is what makes the stricter of the two apply to both.
+     */
+    private int maxSensitivity(List<PolicyRedactionRule> rules, int fallback) {
+        if (rules == null || rules.isEmpty()) return fallback;
+        int max = 0;
+        for (PolicyRedactionRule rule : rules) {
+            max = Math.max(max, rule.getSensitivityLevel() != null ? rule.getSensitivityLevel() : 0);
+        }
+        return max;
+    }
+
+    /**
+     * Describe the policy levels associated with one data element, for the
+     * requestor to see alongside the value.
+     *
+     * Rules are grouped by their distinct (sensitivity, validation) pair, so an
+     * element whose Int'l and Local forms carry different levels reports both
+     * pairs rather than only the one that won. The pair that actually governed
+     * redaction — the highest sensitivity — is flagged as applied.
+     */
+    private Map<String, Object> describeLevels(List<PolicyRedactionRule> rules, int defaultSensitivity) {
+        Map<String, Object> detail = new LinkedHashMap<>();
+
+        if (rules == null || rules.isEmpty()) {
+            Map<String, Object> fallback = new LinkedHashMap<>();
+            fallback.put("sensitivityLevel", defaultSensitivity);
+            fallback.put("validationLevel", null);
+            fallback.put("applied", true);
+            fallback.put("policyDefault", true);
+            fallback.put("sources", new ArrayList<>());
+            detail.put("effectiveSensitivityLevel", defaultSensitivity);
+            detail.put("levels", new ArrayList<>(List.of(fallback)));
+            return detail;
+        }
+
+        Map<String, Map<String, Object>> byPair = new LinkedHashMap<>();
+        int effective = 0;
+        for (PolicyRedactionRule rule : rules) {
+            int sens = rule.getSensitivityLevel() != null ? rule.getSensitivityLevel() : 0;
+            Integer validation = rule.getValidationLevel();
+            effective = Math.max(effective, sens);
+
+            Map<String, Object> pair = byPair.computeIfAbsent(sens + "|" + validation, k -> {
+                Map<String, Object> created = new LinkedHashMap<>();
+                created.put("sensitivityLevel", sens);
+                created.put("validationLevel", validation);
+                created.put("sources", new ArrayList<Map<String, Object>>());
+                return created;
+            });
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> sources = (List<Map<String, Object>>) pair.get("sources");
+            sources.add(describeSource(rule));
+        }
+
+        List<Map<String, Object>> levels = new ArrayList<>(byPair.values());
+        for (Map<String, Object> pair : levels) {
+            pair.put("applied", (Integer) pair.get("sensitivityLevel") == effective);
+        }
+        levels.sort(Comparator.comparingInt(level -> (Integer) level.get("sensitivityLevel")));
+
+        detail.put("effectiveSensitivityLevel", effective);
+        detail.put("levels", levels);
+        return detail;
+    }
+
+    /** Identify the policy field a level pair came from, so the UI can name it. */
+    private Map<String, Object> describeSource(PolicyRedactionRule rule) {
+        Map<String, Object> source = new LinkedHashMap<>();
+        source.put("fieldPath", rule.getFieldPath());
+        source.put("label", rule.getFieldDisplayName());
+        source.put("variant", localeVariant(rule));
+        return source;
+    }
+
+    /**
+     * Which locale variant a rule describes, where a policy tracks the Int'l and
+     * Local forms of a field separately. Imported policies suffix the
+     * local-script variant with ".local" and leave the international form
+     * unsuffixed, carrying the distinction in the display name instead.
+     * Returns null for fields that have no locale variants at all.
+     */
+    private String localeVariant(PolicyRedactionRule rule) {
+        String path = rule.getFieldPath();
+        if (path != null) {
+            if (path.endsWith(".local")) return "local";
+            if (path.endsWith(".intl")) return "intl";
+        }
+        String label = rule.getFieldDisplayName();
+        if (label != null) {
+            String lower = label.toLowerCase();
+            if (lower.contains("(local)")) return "local";
+            if (lower.contains("(int'l") || lower.contains("(intl")) return "intl";
+        }
+        return null;
     }
 
     /**
@@ -267,15 +403,15 @@ public class RdapRedactionService {
 
     @SuppressWarnings("unchecked")
     private void redactChildEntities(Map<String, Object> response, int accessLevel,
-                                      int defaultSensitivity, Map<String, Integer> parentFieldSensitivity,
-                                      PolicyExpression policy, List<String> redactedFields) {
+                                      int defaultSensitivity, PolicyExpression policy,
+                                      List<String> redactedFields) {
         Object entities = response.get("entities");
         if (!(entities instanceof List)) return;
 
-        // Build role-aware sensitivity map:  role → { lookupKey → sensitivityLevel }
-        Map<String, Map<String, Integer>> roleSensitivityMap = buildRoleSensitivityMap(policy);
+        // Build role-aware rule map:  role → { lookupKey → contributing rules }
+        Map<String, Map<String, List<PolicyRedactionRule>>> roleRuleMap = buildRoleRuleMap(policy);
         // Wildcard rules (no role prefix) apply to every entity
-        Map<String, Integer> wildcardSensitivity = roleSensitivityMap.getOrDefault("*", Map.of());
+        Map<String, List<PolicyRedactionRule>> wildcardRules = roleRuleMap.getOrDefault("*", Map.of());
 
         Set<String> entityMeta = Set.of("objectClassName", "roles", "links",
                 "remarks", "notices", "events", "entities", "publicIds");
@@ -286,28 +422,38 @@ public class RdapRedactionService {
             Map<String, Object> child = (Map<String, Object>) item;
 
             // For entities with multiple roles (e.g. ["tech","admin","billing","registrant"]),
-            // merge sensitivity rules from ALL applicable roles, keeping the HIGHEST sensitivity
-            // for each field. This ensures the most restrictive policy applies.
-            Map<String, Integer> effectiveSensitivity = new LinkedHashMap<>(wildcardSensitivity);
+            // gather rules from ALL applicable roles. The highest sensitivity among
+            // them governs each field, so the most restrictive policy applies.
+            Map<String, List<PolicyRedactionRule>> effectiveRules = new LinkedHashMap<>();
+            wildcardRules.forEach((key, rules) -> effectiveRules.put(key, new ArrayList<>(rules)));
 
             List<String> childRoles = resolveAllChildRoles(child);
             for (String role : childRoles) {
-                Map<String, Integer> roleSens = roleSensitivityMap.getOrDefault(role, Map.of());
-                for (Map.Entry<String, Integer> entry : roleSens.entrySet()) {
-                    effectiveSensitivity.merge(entry.getKey(), entry.getValue(), Math::max);
-                }
+                roleRuleMap.getOrDefault(role, Map.of()).forEach((key, rules) ->
+                        effectiveRules.computeIfAbsent(key, k -> new ArrayList<>()).addAll(rules));
             }
+
+            // Levels for this contact, keyed the same way the redaction loops look fields up
+            Map<String, Object> childLevels = new LinkedHashMap<>();
 
             // Redact flat fields
             for (String key : new ArrayList<>(child.keySet())) {
-                if (entityMeta.contains(key) || "vcardArray".equals(key)) continue;
+                if (entityMeta.contains(key) || "vcardArray".equals(key)
+                        || POLICY_LEVELS_KEY.equals(key)) continue;
                 Object value = child.get(key);
-                int sens = effectiveSensitivity.getOrDefault(key, defaultSensitivity);
+                int sens = maxSensitivity(effectiveRules.get(key), defaultSensitivity);
+                childLevels.put(key, describeLevels(effectiveRules.get(key), defaultSensitivity));
                 applyRedaction(child, key, value, accessLevel, sens, redactedFields);
             }
 
             // Redact vCard properties
-            redactVcard(child, accessLevel, defaultSensitivity, effectiveSensitivity, redactedFields);
+            redactVcard(child, accessLevel, defaultSensitivity, effectiveRules, childLevels, redactedFields);
+
+            if (policy != null && !childLevels.isEmpty()) {
+                Map<String, Object> block = new LinkedHashMap<>();
+                block.put("fields", childLevels);
+                child.put(POLICY_LEVELS_KEY, block);
+            }
         }
     }
 
@@ -376,8 +522,9 @@ public class RdapRedactionService {
 
     @SuppressWarnings("unchecked")
     private void redactVcard(Map<String, Object> childEntity, int accessLevel,
-                              int defaultSensitivity, Map<String, Integer> entityFieldSensitivity,
-                              List<String> redactedFields) {
+                              int defaultSensitivity,
+                              Map<String, List<PolicyRedactionRule>> entityFieldRules,
+                              Map<String, Object> childLevels, List<String> redactedFields) {
         Object vcardRaw = childEntity.get("vcardArray");
         if (!(vcardRaw instanceof List)) return;
         List<Object> vcard = (List<Object>) vcardRaw;
@@ -396,7 +543,9 @@ public class RdapRedactionService {
 
             Object propValue = propList.get(3);
             String vcardPath = "vcardArray." + propName;
-            int sens = entityFieldSensitivity.getOrDefault(vcardPath, defaultSensitivity);
+            List<PolicyRedactionRule> propRules = entityFieldRules.get(vcardPath);
+            int sens = maxSensitivity(propRules, defaultSensitivity);
+            childLevels.put(vcardPath, describeLevels(propRules, defaultSensitivity));
             boolean isEmpty = isValueEmpty(propValue);
             RedactionBehavior behavior = redactionService.getBehavior(accessLevel, sens, isEmpty);
 

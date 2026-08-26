@@ -541,6 +541,33 @@
     "no": "No",
     "noData": "No data available",
     "notAvailable": "N/A",
+    "policyLevels": {
+      "appliedNote": "Applied to this element.",
+      "fromFields": "From: {{fields}}",
+      "hide": "Hide levels",
+      "legend": "S = sensitivity, V = validation. Hover a badge for detail.",
+      "policyDefault": "No policy rule covers this element \u2014 the policy default sensitivity applied.",
+      "policyName": "Policy: {{name}}",
+      "sensitivityNames": {
+        "level0": "Public",
+        "level1": "Basic",
+        "level2": "Enhanced",
+        "level3": "Full"
+      },
+      "sensitivityTitle": "Sensitivity {{level}} \u2014 {{name}}",
+      "show": "Show levels",
+      "supersededNote": "Superseded \u2014 sensitivity {{level}} is the level that applied to this element.",
+      "title": "Policy levels",
+      "unnamed": "unnamed",
+      "validationNames": {
+        "level0": "None",
+        "level1": "Syntactical",
+        "level2": "Operational",
+        "level3": "Identification"
+      },
+      "validationTitle": "Validation {{level}} \u2014 {{name}}",
+      "validationUnset": "Validation level: not specified by the policy."
+    },
     "yes": "Yes"
   },
   "rdapRequests": {

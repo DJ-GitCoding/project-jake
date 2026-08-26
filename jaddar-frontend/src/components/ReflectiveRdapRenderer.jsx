@@ -12,6 +12,7 @@ import { useT } from '../i18n';
 const ReflectiveRdapRenderer = ({ data, accessLevel, className = '' }) => {
   const { t } = useT();
   const [collapsedSections, setCollapsedSections] = useState({});
+  const [showPolicyLevels, setShowPolicyLevels] = useState(true);
 
   const isAnnotatedValue = (value) => {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
@@ -55,6 +56,17 @@ const ReflectiveRdapRenderer = ({ data, accessLevel, className = '' }) => {
     return <div className="text-center text-muted p-5">{t('rdapRenderer.noData')}</div>;
   }
 
+  /*
+   * Per-element policy levels, sent by the data holder alongside the data it
+   * describes. `fields` is keyed exactly the way the data holder's redaction
+   * code looks elements up: top-level RDAP keys on the object itself, and
+   * "vcardArray.<property>" inside each contact so a contact carries its own
+   * block, since the levels that apply depend on the contact's role.
+   */
+  const policyLevels = typeof cleanData === 'object' && !Array.isArray(cleanData)
+    ? cleanData.policyLevels : null;
+  const topLevelPolicyFields = policyLevels?.fields || null;
+
   const toggleSection = (key) => {
     setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }));
   };
@@ -80,6 +92,125 @@ const ReflectiveRdapRenderer = ({ data, accessLevel, className = '' }) => {
   };
 
   const levelTagFor = (path) => renderAccessLevelTag(globalLevels[path] ?? null);
+
+  // ============================================
+  // POLICY LEVELS — sensitivity / validation per data element
+  // ============================================
+
+  const SENSITIVITY_STYLES = {
+    0: { bg: '#e8f5e9', text: '#2e7d32', border: '#a5d6a7' },
+    1: { bg: '#e3f2fd', text: '#1565c0', border: '#90caf9' },
+    2: { bg: '#fff3e0', text: '#e65100', border: '#ffcc80' },
+    3: { bg: '#fce4ec', text: '#c62828', border: '#ef9a9a' },
+  };
+
+  const VALIDATION_STYLES = {
+    0: { bg: '#f5f5f5', text: '#616161', border: '#bdbdbd' },
+    1: { bg: '#e3f2fd', text: '#1565c0', border: '#90caf9' },
+    2: { bg: '#fff3e0', text: '#e65100', border: '#ffcc80' },
+    3: { bg: '#ede7f6', text: '#5e35b1', border: '#b39ddb' },
+  };
+
+  const NEUTRAL_STYLE = { bg: '#f8f9fa', text: '#6c757d', border: '#dee2e6' };
+
+  const levelName = (group, level) => {
+    if (level === null || level === undefined) return null;
+    const name = t(`rdapRenderer.policyLevels.${group}Names.level${level}`);
+    return name === `rdapRenderer.policyLevels.${group}Names.level${level}` ? null : name;
+  };
+
+  const policyDetailFor = (fields, key) => (fields ? fields[key] : null);
+
+  const levelPairTitle = (pair, detail, multiple) => {
+    const lines = [];
+    const sName = levelName('sensitivity', pair.sensitivityLevel);
+    lines.push(t('rdapRenderer.policyLevels.sensitivityTitle', {
+      level: pair.sensitivityLevel,
+      name: sName || t('rdapRenderer.policyLevels.unnamed'),
+    }));
+    if (pair.validationLevel === null || pair.validationLevel === undefined) {
+      lines.push(t('rdapRenderer.policyLevels.validationUnset'));
+    } else {
+      const vName = levelName('validation', pair.validationLevel);
+      lines.push(t('rdapRenderer.policyLevels.validationTitle', {
+        level: pair.validationLevel,
+        name: vName || t('rdapRenderer.policyLevels.unnamed'),
+      }));
+    }
+    if (pair.policyDefault) {
+      lines.push(t('rdapRenderer.policyLevels.policyDefault'));
+    }
+    const sources = (pair.sources || [])
+      .map((src) => src.label || src.fieldPath)
+      .filter(Boolean);
+    if (sources.length > 0) {
+      lines.push(t('rdapRenderer.policyLevels.fromFields', { fields: sources.join(', ') }));
+    }
+    if (multiple) {
+      lines.push(pair.applied
+        ? t('rdapRenderer.policyLevels.appliedNote')
+        : t('rdapRenderer.policyLevels.supersededNote', { level: detail.effectiveSensitivityLevel }));
+    }
+    return lines.join('\n');
+  };
+
+  const segmentStyle = (palette, dashed) => ({
+    display: 'inline-block',
+    fontSize: '0.62rem',
+    fontWeight: 600,
+    lineHeight: 1.4,
+    padding: '0 4px',
+    backgroundColor: palette.bg,
+    color: palette.text,
+    border: `1px ${dashed ? 'dashed' : 'solid'} ${palette.border}`,
+  });
+
+  const renderLevelPair = (pair, idx, detail, multiple) => {
+    /* A pair that lost to a higher sensitivity is dimmed rather than dropped:
+    the requestor should still see every level the policy associated with the
+    element, not just the one that governed the redaction. */
+    const superseded = multiple && !pair.applied;
+    const dashed = Boolean(pair.policyDefault);
+    const sensPalette = SENSITIVITY_STYLES[pair.sensitivityLevel] || NEUTRAL_STYLE;
+    const validationSet = pair.validationLevel !== null && pair.validationLevel !== undefined;
+    const valPalette = validationSet
+      ? (VALIDATION_STYLES[pair.validationLevel] || NEUTRAL_STYLE)
+      : NEUTRAL_STYLE;
+
+    return (
+      <span
+        key={idx}
+        title={levelPairTitle(pair, detail, multiple)}
+        style={{ whiteSpace: 'nowrap', opacity: superseded ? 0.5 : 1 }}
+      >
+        <span style={{ ...segmentStyle(sensPalette, dashed), borderRadius: '4px 0 0 4px', borderRight: 'none' }}>
+          S{pair.sensitivityLevel}
+        </span>
+        <span style={{ ...segmentStyle(valPalette, dashed), borderRadius: '0 4px 4px 0' }}>
+          {validationSet ? `V${pair.validationLevel}` : 'V–'}
+        </span>
+      </span>
+    );
+  };
+
+  /* Renders every (sensitivity, validation) pair the policy associated with one
+  element. Most elements have exactly one. An element whose Int'l and Local
+  forms carry different levels — or an address, where every component collapses
+  onto a single vCard property — reports one pair per distinct combination. */
+  const renderPolicyLevels = (detail) => {
+    if (!showPolicyLevels || !detail || !Array.isArray(detail.levels) || detail.levels.length === 0) return null;
+    const multiple = detail.levels.length > 1;
+    return (
+      <span className="ms-1" style={{ verticalAlign: 'middle' }}>
+        {detail.levels.map((pair, idx) => (
+          <React.Fragment key={idx}>
+            {idx > 0 && <span style={{ display: 'inline-block', width: '3px' }} />}
+            {renderLevelPair(pair, idx, detail, multiple)}
+          </React.Fragment>
+        ))}
+      </span>
+    );
+  };
 
   const getType = (value) => {
     if (value === null) return 'null';
@@ -299,7 +430,7 @@ const ReflectiveRdapRenderer = ({ data, accessLevel, className = '' }) => {
     return <div className="small">{parts.map((part, idx) => <div key={idx}>{safeString(part)}</div>)}</div>;
   };
 
-  const renderVcard = (vcardArray) => {
+  const renderVcard = (vcardArray, policyFields = null) => {
     if (!vcardArray || !Array.isArray(vcardArray) || !vcardArray[1]) return null;
     const fields = vcardArray[1];
     const labels = { fn: 'Name', org: 'Organization', email: 'Email', tel: 'Phone', adr: 'Address', title: 'Title', role: 'Role', url: 'URL', note: 'Note', kind: 'Kind' };
@@ -321,6 +452,7 @@ const ReflectiveRdapRenderer = ({ data, accessLevel, className = '' }) => {
             }
           }
           const typeInfo = params && params.type ? ` (${params.type})` : '';
+          const policyDetail = policyDetailFor(policyFields, `vcardArray.${fieldType}`);
           return (
             <div key={idx} className="mb-1">
               <span className="text-muted small">{label}{typeInfo}: </span>
@@ -328,6 +460,7 @@ const ReflectiveRdapRenderer = ({ data, accessLevel, className = '' }) => {
                 : fieldType === 'tel' ? renderPrimitive('tel', safeString(displayValue))
                 : fieldType === 'url' ? renderPrimitive('url', safeString(displayValue))
                 : <span>{safeString(displayValue)}</span>}
+              {renderPolicyLevels(policyDetail)}
             </div>
           );
         })}
@@ -522,6 +655,7 @@ const ReflectiveRdapRenderer = ({ data, accessLevel, className = '' }) => {
     const handleStr = typeof contact.handle === 'string' ? contact.handle : safeString(contact.handle);
     const roles = Array.isArray(contact.roles) ? contact.roles : [];
     const displayTitle = title || roles.join(', ') || 'Entity';
+    const policyFields = contact.policyLevels?.fields || null;
 
     return (
       <div className="border rounded h-100" style={{ fontSize: '13px' }}>
@@ -529,16 +663,18 @@ const ReflectiveRdapRenderer = ({ data, accessLevel, className = '' }) => {
           <i className={`bi ${getFieldIcon(displayTitle)} text-primary`} style={{ fontSize: '12px' }}></i>
           <strong className="small">{formatKey(displayTitle)}</strong>
           {handleStr && <code className="ms-auto text-muted" style={{ fontSize: '10px' }}>{handleStr}</code>}
+          {handleStr && renderPolicyLevels(policyDetailFor(policyFields, 'handle'))}
         </div>
         <div className="px-2 py-1">
-          {contact.vcardArray && renderVcard(contact.vcardArray)}
+          {contact.vcardArray && renderVcard(contact.vcardArray, policyFields)}
           {Object.entries(contact).map(([key, value]) => {
-            if (['vcardArray', 'roles', 'handle', 'objectClassName', 'links', 'events', 'entities'].includes(key)) return null;
+            if (['vcardArray', 'roles', 'handle', 'objectClassName', 'links', 'events', 'entities', 'policyLevels'].includes(key)) return null;
             if (isEmpty(value)) return null;
             return (
               <div key={key} className="mb-1">
                 <span className="text-muted small">{formatKey(key)}: </span>
                 {renderValue(key, value, 2)}
+                {renderPolicyLevels(policyDetailFor(policyFields, key))}
               </div>
             );
           })}
@@ -697,6 +833,8 @@ const ReflectiveRdapRenderer = ({ data, accessLevel, className = '' }) => {
 
     Object.entries(obj).forEach(([key, value]) => {
       if (isEmpty(value)) return;
+      // Not a data element, so it is rendered inline against the elements it describes...
+      if (key === 'policyLevels') return;
       const k = key.toLowerCase();
       if (['objectclassname', 'handle', 'parent_handle', 'ldhname', 'name', 'unicodename', 'unicode_name', 'type', 'rir', 'lang'].includes(k)) {
         categories.identity.keys.push(key);
@@ -737,6 +875,30 @@ const ReflectiveRdapRenderer = ({ data, accessLevel, className = '' }) => {
           </div>
         )}
 
+        {policyLevels && (
+          <div className="d-flex align-items-center flex-wrap gap-2 mb-2 py-1 px-2 border rounded small">
+            <strong>{t('rdapRenderer.policyLevels.title')}</strong>
+            {policyLevels.policyName && (
+              <span className="text-muted">
+                {t('rdapRenderer.policyLevels.policyName', { name: policyLevels.policyName })}
+              </span>
+            )}
+            <span className="text-muted" style={{ fontSize: '11px' }}>
+              {t('rdapRenderer.policyLevels.legend')}
+            </span>
+            <button
+              type="button"
+              className="btn btn-link btn-sm p-0 ms-auto text-decoration-none"
+              style={{ fontSize: '11px' }}
+              onClick={() => setShowPolicyLevels((prev) => !prev)}
+            >
+              {showPolicyLevels
+                ? t('rdapRenderer.policyLevels.hide')
+                : t('rdapRenderer.policyLevels.show')}
+            </button>
+          </div>
+        )}
+
         {nonEmptyCategories.map(category => {
           const isCollapsed = collapsedSections[category.key];
 
@@ -768,6 +930,7 @@ const ReflectiveRdapRenderer = ({ data, accessLevel, className = '' }) => {
                           <div>
                             <span className="text-muted small">
                               <i className={`bi ${getFieldIcon(key)} me-1`}></i>{formatKey(key)}:
+                              {renderPolicyLevels(policyDetailFor(topLevelPolicyFields, key))}
                             </span>
                             {rendered}
                           </div>
@@ -775,6 +938,7 @@ const ReflectiveRdapRenderer = ({ data, accessLevel, className = '' }) => {
                           <div className="p-2 bg-light rounded h-100">
                             <span className="d-block text-muted small mb-1">
                               <i className={`bi ${getFieldIcon(key)} me-1`}></i>{formatKey(key)}:
+                              {renderPolicyLevels(policyDetailFor(topLevelPolicyFields, key))}
                             </span>
                             {rendered}
                           </div>

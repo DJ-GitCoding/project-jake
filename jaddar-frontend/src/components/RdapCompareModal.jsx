@@ -23,6 +23,8 @@ import { useT } from '../i18n';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const isPolicyMetaKey = (key) => key === 'policyLevels';
+
 const flattenObject = (obj, prefix = '') => {
   const result = {};
   if (obj === null || obj === undefined) return result;
@@ -38,6 +40,7 @@ const flattenObject = (obj, prefix = '') => {
     });
   } else if (typeof obj === 'object') {
     Object.entries(obj).forEach(([k, v]) => {
+      if (isPolicyMetaKey(k)) return;
       const key = prefix ? `${prefix}.${k}` : k;
       if (typeof v === 'object' && v !== null) {
         Object.assign(result, flattenObject(v, key));
