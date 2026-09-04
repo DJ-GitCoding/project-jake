@@ -39,11 +39,12 @@ app.use(
         fontSrc: ["'self'", "data:"],
         connectSrc: ["'self'"],
         objectSrc: ["'none'"],
-        frameAncestors: ["'none'"],
+        frameAncestors: ["'self'"],
         baseUri: ["'self'"],
       },
     },
     hsts: false,
+    frameguard: false,
   })
 );
 app.use(morgan("tiny"));
