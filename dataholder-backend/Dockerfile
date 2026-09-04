@@ -28,7 +28,8 @@ RUN if [ -f /tmp/cactx/infra-ca.crt ]; then \
     else echo "No infra CA staged; skipping cacerts import"; fi && \
     rm -rf /tmp/cactx
 
-# Set ownership
+# Setup application directories and permissions
+RUN mkdir -p /app/uploads
 RUN chown -R spring:spring /app
 USER spring
 
