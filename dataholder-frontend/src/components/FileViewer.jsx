@@ -17,12 +17,8 @@ import { useT } from '../i18n';
  * Props:
  *   requestId: UUID string of the request
  *   compact: boolean - if true, shows a compact inline view
- *   onApprove: function(requestId) - optional callback to approve the request
- *   onDeny: function(requestId) - optional callback to deny the request
- *   showActions: boolean - whether to show approve/deny actions in the examine panel
- *   requestStatus: string - current status of the request (PENDING, APPROVED, DENIED, etc.)
  */
-const FileViewer = ({ requestId, compact = false, onApprove, onDeny, showActions = false, requestStatus }) => {
+const FileViewer = ({ requestId, compact = false }) => {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -479,66 +475,12 @@ const FileViewer = ({ requestId, compact = false, onApprove, onDeny, showActions
               borderTop: '1px solid var(--border-primary)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent: 'flex-end',
               gap: '12px',
               background: 'var(--bg-secondary, #f8f9fa)',
               flexShrink: 0,
               flexWrap: 'wrap',
             }}>
-              {/* Left side: approve/deny actions */}
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                {showActions && requestStatus === 'PENDING' && (
-                  <>
-                    {onApprove && (
-                      <button
-                        className="btn btn-success btn-sm"
-                        onClick={() => {
-                          setExamineFile(null);
-                          onApprove(requestId);
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          fontSize: '13px',
-                          padding: '7px 16px',
-                          fontWeight: 600,
-                        }}
-                      >
-                        <i className="fa-solid fa-check" style={{ fontSize: '12px' }} />
-                        {t('fileViewer.approveRequest')}
-                      </button>
-                    )}
-                    {onDeny && (
-                      <button
-                        className="btn btn-danger btn-sm"
-                        onClick={() => {
-                          setExamineFile(null);
-                          onDeny(requestId);
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          fontSize: '13px',
-                          padding: '7px 16px',
-                          fontWeight: 600,
-                        }}
-                      >
-                        <i className="fa-solid fa-xmark" style={{ fontSize: '12px' }} />
-                        {t('fileViewer.denyRequest')}
-                      </button>
-                    )}
-                  </>
-                )}
-                {showActions && requestStatus && requestStatus !== 'PENDING' && (
-                  <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
-                    {t('fileViewer.alreadyProcessed', { status: requestStatus.toLowerCase() })}
-                  </span>
-                )}
-              </div>
-
-              {/* Right side: download */}
               <a
                 href={getFileDownloadUrl(examineFile.fileId)}
                 download={examineFile.originalFilename}

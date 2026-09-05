@@ -735,16 +735,6 @@ const PendingRequests = () => {
                   <FileViewer
                     requestId={selectedRequest.requestId}
                     compact
-                    showActions={reviewAction === 'view'}
-                    requestStatus={selectedRequest.status}
-                    onApprove={() => {
-                      setShowReviewModal(false);
-                      openReviewModal(selectedRequest, 'approve');
-                    }}
-                    onDeny={() => {
-                      setShowReviewModal(false);
-                      openReviewModal(selectedRequest, 'deny');
-                    }}
                   />
                 </div>
               </div>
@@ -972,34 +962,9 @@ const PendingRequests = () => {
               {/* Footer with actions */}
               <div style={{
                 padding: '14px 20px', borderTop: '1px solid var(--border-primary)',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+                display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '12px',
                 background: 'var(--bg-secondary, #f8f9fa)', flexShrink: 0, flexWrap: 'wrap',
               }}>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  {selectedRequest && selectedRequest.status === 'PENDING' && (
-                    <>
-                      <button
-                        className="btn btn-success btn-sm"
-                        onClick={() => { setExamineCustomFile(null); setShowReviewModal(false); openReviewModal(selectedRequest, 'approve'); }}
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', padding: '7px 16px', fontWeight: 600 }}
-                      >
-                        <i className="fa-solid fa-check" style={{ fontSize: '12px' }} /> {t('pendingRequests.details.approveRequest')}
-                      </button>
-                      <button
-                        className="btn btn-danger btn-sm"
-                        onClick={() => { setExamineCustomFile(null); setShowReviewModal(false); openReviewModal(selectedRequest, 'deny'); }}
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', padding: '7px 16px', fontWeight: 600 }}
-                      >
-                        <i className="fa-solid fa-xmark" style={{ fontSize: '12px' }} /> {t('pendingRequests.details.denyRequest')}
-                      </button>
-                    </>
-                  )}
-                  {selectedRequest && selectedRequest.status !== 'PENDING' && (
-                    <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
-                      {t('pendingRequests.details.alreadyReviewed', { status: selectedRequest.status.toLowerCase() })}
-                    </span>
-                  )}
-                </div>
                 {file.fileUrl && (
                   <a
                     href={file.fileDownloadUrl || file.fileUrl} download={file.filename} target="_blank" rel="noopener noreferrer"

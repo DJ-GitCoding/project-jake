@@ -10,10 +10,14 @@ package com.jaddar.controller;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jaddar.dto.AgreementSummary;
+import com.jaddar.dto.CustomParameterSummary;
 import com.jaddar.dto.RdapResolution;
 import com.jaddar.dto.RdapResponse;
+import com.jaddar.dto.RequestTypeSummary;
 import com.jaddar.enums.QueryType;
 import com.jaddar.exception.ApiException;
+import com.jaddar.service.AgreementService;
 import com.jaddar.service.IanaBootstrapService;
 import com.jaddar.service.RdapFileService;
 import com.jaddar.service.RdapService;
@@ -45,7 +49,10 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * File upload / download routes and the multipart query-with-file route, ported
@@ -62,17 +69,20 @@ public class RdapFileController {
     private final RdapFileService fileService;
     private final RdapService rdapService;
     private final IanaBootstrapService ianaBootstrapService;
+    private final AgreementService agreementService;
     private final WebClient rdapWebClient;
     private final ObjectMapper objectMapper;
 
     public RdapFileController(RdapFileService fileService,
                              RdapService rdapService,
                              IanaBootstrapService ianaBootstrapService,
+                             AgreementService agreementService,
                              @Qualifier("rdapWebClient") WebClient rdapWebClient,
                              ObjectMapper objectMapper) {
         this.fileService = fileService;
         this.rdapService = rdapService;
         this.ianaBootstrapService = ianaBootstrapService;
+        this.agreementService = agreementService;
         this.rdapWebClient = rdapWebClient;
         this.objectMapper = objectMapper;
     }
@@ -171,6 +181,49 @@ public class RdapFileController {
         }
     }
 
+    private void rejectUndeclaredFileParams(String requestTypeCode, List<String> paramNames, String authHeader) {
+        if (requestTypeCode == null || requestTypeCode.isBlank() || authHeader == null) return;
+
+        List<RequestTypeSummary> matches;
+        try {
+            matches = agreementService.getUserAgreements(authHeader).getAgreements().stream()
+                    .map(AgreementSummary::getRequestTypes)
+                    .filter(Objects::nonNull)
+                    .flatMap(List::stream)
+                    .filter(rt -> rt.getTypeCode() != null
+                            && requestTypeCode.equals(String.valueOf(rt.getTypeCode())))
+                    .toList();
+        } catch (Exception e) {
+            log.warn("Could not resolve request type {} to validate file parameters: {}",
+                    requestTypeCode, e.getMessage());
+            return;
+        }
+
+        if (matches.isEmpty()) {
+            log.warn("Request type {} not found in the caller's catalog; skipping file parameter validation",
+                    requestTypeCode);
+            return;
+        }
+
+        Set<String> declared = matches.stream()
+                .map(RequestTypeSummary::getCustomParameters)
+                .filter(Objects::nonNull)
+                .flatMap(List::stream)
+                .filter(p -> "file".equalsIgnoreCase(p.getDataType()))
+                .map(CustomParameterSummary::getName)
+                .collect(Collectors.toSet());
+
+        for (String pname : paramNames) {
+            if (!declared.contains(pname)) {
+                log.warn("Rejected upload for undeclared file parameter '{}' on request type {}",
+                        pname, requestTypeCode);
+                throw new ApiException(HttpStatus.BAD_REQUEST,
+                        "The attachment '" + pname + "' is not accepted by this request type. "
+                                + "Please reselect your files and try again.");
+            }
+        }
+    }
+
     @PostMapping(value = "/query-with-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Object rdapQueryWithFile(
             @RequestParam("query") String query,
@@ -209,6 +262,8 @@ public class RdapFileController {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7);
         }
+
+        rejectUndeclaredFileParams(requestType, paramNames, authHeader);
 
         // Scan + store every file.
         List<Map<String, Object>> allFileMeta = new ArrayList<>();

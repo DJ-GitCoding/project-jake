@@ -27,6 +27,7 @@ const RDAPSearch = () => {
   const [exigent, setExigent] = useState(false);
   const [customParamValues, setCustomParamValues] = useState({});
   const [customParamFiles, setCustomParamFiles] = useState({});  // Stores actual File objects for file-type params
+  const [fileResetToken, setFileResetToken] = useState(0);
   const [isStuck, setIsStuck] = useState(false);
 
   const pollingRef = useRef(false);
@@ -59,12 +60,23 @@ const RDAPSearch = () => {
     return [...rt.customParameters].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
   }, [selectedAgreement]);
 
+  const activeFileParamNames = useMemo(
+    () => new Set(activeCustomParams.filter(p => p.dataType === 'file').map(p => p.name)),
+    [activeCustomParams]
+  );
+
+  const clearStagedFiles = () => {
+    setCustomParamFiles({});
+    setFileResetToken(t => t + 1);
+  };
+
   useEffect(() => {
     const defaults = {};
     activeCustomParams.forEach(p => {
       if (p.defaultValue !== undefined && p.defaultValue !== null && p.defaultValue !== '') defaults[p.name] = p.defaultValue;
     });
     setCustomParamValues(defaults);
+    clearStagedFiles();
   }, [activeCustomParams]);
 
   useEffect(() => {
@@ -142,8 +154,9 @@ const RDAPSearch = () => {
       const customPayload = getCustomParamsPayload();
       const headers = {};
 
-      // Check if any file-type params have actual File objects to upload
-      const fileEntries = Object.entries(customParamFiles).filter(([, f]) => f instanceof File);
+      // Only files belonging to the selected request type may be sent.
+      const fileEntries = Object.entries(customParamFiles)
+        .filter(([name, f]) => f instanceof File && activeFileParamNames.has(name));
       let response;
 
       if (fileEntries.length > 0) {
@@ -622,7 +635,7 @@ const RDAPSearch = () => {
                     {param.dataType === 'enum' && <select id={inputId} className="form-select form-select-sm" value={val} onChange={(e) => setVal(e.target.value)} disabled={loading} required={param.required}><option value="">{param.placeholder || '— Select —'}</option>{(param.enumValues || '').split(',').map(o => o.trim()).filter(Boolean).map(opt => <option key={opt} value={opt}>{opt}</option>)}</select>}
                     {param.dataType === 'text' && <textarea id={inputId} className="form-control form-control-sm" value={val} onChange={(e) => setVal(e.target.value)} placeholder={param.placeholder || ''} rows={2} maxLength={param.maxLength || undefined} disabled={loading} required={param.required} />}
                     {param.dataType === 'json' && <textarea id={inputId} className="form-control form-control-sm font-monospace" value={val} onChange={(e) => setVal(e.target.value)} placeholder={param.placeholder || '{ }'} rows={2} disabled={loading} required={param.required} style={{ fontSize: '11px' }} />}
-                    {param.dataType === 'file' && <input type="file" id={inputId} className="form-control form-control-sm" accept={param.allowedFileTypes || undefined} onChange={(e) => { const file = e.target.files?.[0]; if (file) { if (param.maxFileSizeMb && file.size > param.maxFileSizeMb * 1024 * 1024) { showError(`File exceeds ${param.maxFileSizeMb}MB`); e.target.value = ''; return; } setVal(file.name); setCustomParamFiles(prev => ({ ...prev, [param.name]: file })); } else { setCustomParamFiles(prev => { const n = { ...prev }; delete n[param.name]; return n; }); } }} disabled={loading} required={param.required} />}
+                    {param.dataType === 'file' && <input type="file" key={`${param.name}-${fileResetToken}`} id={inputId} className="form-control form-control-sm" accept={param.allowedFileTypes || undefined} onChange={(e) => { const file = e.target.files?.[0]; const drop = () => { setVal(''); setCustomParamFiles(prev => { const n = { ...prev }; delete n[param.name]; return n; }); }; if (!file) { drop(); return; } if (param.maxFileSizeMb && file.size > param.maxFileSizeMb * 1024 * 1024) { showError(`File exceeds ${param.maxFileSizeMb}MB`); e.target.value = ''; drop(); return; } setVal(file.name); setCustomParamFiles(prev => ({ ...prev, [param.name]: file })); }} disabled={loading} required={param.required} />}
                     {param.description && <div className="form-text" style={{ fontSize: '10px' }}>{param.description}</div>}
                   </div>
                 );
