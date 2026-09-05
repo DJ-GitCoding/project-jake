@@ -132,12 +132,27 @@ export async function loginWithCode(request, code) {
   return establishSession(request, body);
 }
 
+/*
+ * A session counts as authenticated only when the profile AND a usable access
+ * token are both present.
+ */
+function authenticatedUser(session) {
+  const user = getUser(session);
+  if (!user) return null;
+  return getTokens(session)?.accessToken ? user : null;
+}
+
 /** Loader guard: require an authenticated session or redirect to /login. */
 export async function requireUser(request) {
   const session = await getSession(request);
-  const user = getUser(session);
-  if (!user) throw redirect("/login");
-  return user;
+  const user = authenticatedUser(session);
+  if (user) return user;
+  if (getUser(session)) {
+    throw redirect("/login?expired=1", {
+      headers: { "Set-Cookie": await destroySession(session) },
+    });
+  }
+  throw redirect("/login");
 }
 
 /** Loader guard: require an admin session, else redirect to /dashboard. */
@@ -149,7 +164,7 @@ export async function requireAdmin(request) {
 
 export async function getUserOptional(request) {
   const session = await getSession(request);
-  return getUser(session);
+  return authenticatedUser(session);
 }
 
 /** Refresh the access token server-side using the stored refresh token. */

@@ -12,8 +12,9 @@ import { getSession } from "../lib/session.server.js";
 import { assertCsrf } from "../lib/csrf.server.js";
 
 export async function loader({ request }) {
-  if (await getUserOptional(request)) throw redirect("/dashboard");
-  return null;
+  const expired = new URL(request.url).searchParams.has("expired");
+  if (!expired && (await getUserOptional(request))) throw redirect("/dashboard");
+  return { expired };
 }
 
 export async function action({ request }) {

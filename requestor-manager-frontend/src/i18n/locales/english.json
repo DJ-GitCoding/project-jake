@@ -35,7 +35,8 @@
     "signingIn": "Signing in...",
     "signIn": "Sign In",
     "forgotPassword": "Forgot password?",
-    "credentialsHint": "Use your Keycloak credentials to sign in"
+    "credentialsHint": "Use your Keycloak credentials to sign in",
+    "sessionExpired": "Your session has expired. Please sign in again."
   },
   "forgotPassword": {
     "title": "Forgot Password",

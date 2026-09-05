@@ -12,6 +12,7 @@ import {
   getUser,
   setAuth,
   commitSession,
+  destroySession,
 } from "../lib/session.server.js";
 import { refreshTokens } from "../lib/auth.server.js";
 import { BACKEND_URL } from "../lib/config.server.js";
@@ -35,7 +36,7 @@ function passthroughHeaders(res) {
   return headers;
 }
 
-async function forward(request, accessToken) {
+async function forward(request, accessToken, body) {
   const url = new URL(request.url);
   const target = BACKEND_URL + url.pathname + url.search; // pathname is /api/...
   const headers = new Headers();
@@ -45,9 +46,7 @@ async function forward(request, accessToken) {
   if (accept) headers.set("accept", accept);
   if (accessToken) headers.set("authorization", `Bearer ${accessToken}`);
   const init = { method: request.method, headers, redirect: "manual" };
-  if (!["GET", "HEAD"].includes(request.method)) {
-    init.body = Buffer.from(await request.arrayBuffer());
-  }
+  if (body !== undefined) init.body = body;
   return fetch(target, init);
 }
 
@@ -55,17 +54,33 @@ async function proxy(request) {
   const session = await getSession(request);
   const tokens = getTokens(session);
 
-  let res = await forward(request, tokens?.accessToken);
+  // Buffer the body once. The retry below re-sends it, and a request stream can
+  // only be read a single time ("Body is unusable" on the second read).
+  const requestBody = ["GET", "HEAD"].includes(request.method)
+    ? undefined
+    : Buffer.from(await request.arrayBuffer());
 
-  if (res.status === 401 && tokens?.refreshToken) {
-    const refreshed = await refreshTokens(tokens.refreshToken);
+  let res = await forward(request, tokens?.accessToken, requestBody);
+
+  if (res.status === 401) {
+    const refreshed = tokens?.refreshToken
+      ? await refreshTokens(tokens.refreshToken)
+      : null;
+
     if (refreshed) {
       setAuth(session, { user: getUser(session), ...refreshed });
-      res = await forward(request, refreshed.accessToken);
-      const body = await res.arrayBuffer();
+      res = await forward(request, refreshed.accessToken, requestBody);
+      const responseBody = await res.arrayBuffer();
       const headers = passthroughHeaders(res);
       headers.append("Set-Cookie", await commitSession(session));
-      return new Response(body, { status: res.status, headers });
+      return new Response(responseBody, { status: res.status, headers });
+    }
+
+    if (getUser(session)) {
+      const deadBody = await res.arrayBuffer();
+      const headers = passthroughHeaders(res);
+      headers.append("Set-Cookie", await destroySession(session));
+      return new Response(deadBody, { status: res.status, headers });
     }
   }
 

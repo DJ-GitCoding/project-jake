@@ -345,6 +345,7 @@
     "needHelp": "Need help?",
     "passwordLabel": "Password",
     "passwordPlaceholder": "Enter your password",
+    "sessionExpired": "Your session has expired. Please sign in again.",
     "signIn": "Sign in",
     "signingIn": "Signing in...",
     "subtitle": "Please sign in to continue",

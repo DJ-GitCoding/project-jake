@@ -17,12 +17,21 @@ const api = axios.create({
   baseURL: '',
 });
 
-// On 401 (session expired / not authenticated) send the user to the login page.
+/*
+ * On 401 (session expired / not authenticated) send the user to the login page.
+ */
+let redirectingToLogin = false;
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401 && typeof window !== 'undefined') {
-      window.location.href = '/login';
+    if (
+      error.response?.status === 401 &&
+      typeof window !== 'undefined' &&
+      !redirectingToLogin &&
+      !window.location.pathname.startsWith('/login')
+    ) {
+      redirectingToLogin = true;
+      window.location.href = '/login?expired=1';
     }
     return Promise.reject(error);
   }

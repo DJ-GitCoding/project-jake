@@ -7,7 +7,7 @@
  */
 
 import React, { useState } from 'react';
-import { Link, Form, useActionData, useNavigation, useRouteLoaderData } from 'react-router';
+import { Link, Form, useActionData, useLoaderData, useNavigation, useRouteLoaderData } from 'react-router';
 import { useT } from '../i18n';
 
 const Login = () => {
@@ -18,6 +18,7 @@ const Login = () => {
   const navigation = useNavigation();
   const loading = navigation.state !== 'idle';
   const { t } = useT();
+  const expired = useLoaderData()?.expired;
 
   return (
     <div className="login-page">
@@ -31,6 +32,13 @@ const Login = () => {
         </div>
 
         <div className="login-body">
+          {expired && !actionData?.error && (
+            <div className="alert alert-warning d-flex align-items-center" role="alert">
+              <i className="fas fa-clock me-2"></i>
+              <div>{t('login.sessionExpired')}</div>
+            </div>
+          )}
+
           {actionData?.error && (
             <div className="alert alert-danger d-flex align-items-center" role="alert">
               <i className="fas fa-exclamation-circle me-2"></i>

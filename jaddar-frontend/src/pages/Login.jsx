@@ -7,7 +7,7 @@
  */
 
 import React, { useState } from 'react';
-import { Link, Form, useActionData, useNavigation, useRouteLoaderData } from 'react-router';
+import { Link, Form, useActionData, useLoaderData, useNavigation, useRouteLoaderData } from 'react-router';
 import { useT } from '../i18n';
 import { useConfig } from '../contexts/ConfigContext';
 
@@ -22,6 +22,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   const error = actionData?.error;
+  const expired = useLoaderData()?.expired;
 
   return (
     <div className="container-fluid min-vh-100 d-flex align-items-center justify-content-center bg-light">
@@ -63,6 +64,12 @@ const Login = () => {
                 <h2 className="fw-bold mb-2">{t('login.welcome')}</h2>
                 <p className="text-secondary mb-4">{t('login.subtitle')}</p>
               </div>
+
+              {expired && !error && (
+                <div className="alert alert-warning py-2" role="alert">
+                  {t('login.sessionExpired')}
+                </div>
+              )}
 
               {error && (
                 <div className="alert alert-danger py-2" role="alert">
