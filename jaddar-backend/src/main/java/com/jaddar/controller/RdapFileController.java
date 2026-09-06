@@ -181,8 +181,8 @@ public class RdapFileController {
         }
     }
 
-    private void rejectUndeclaredFileParams(String requestTypeCode, List<String> paramNames, String authHeader) {
-        if (requestTypeCode == null || requestTypeCode.isBlank() || authHeader == null) return;
+    private void rejectUndeclaredFileParams(Integer requestTypeCode, List<String> paramNames, String authHeader) {
+        if (requestTypeCode == null || authHeader == null) return;
 
         List<RequestTypeSummary> matches;
         try {
@@ -190,8 +190,7 @@ public class RdapFileController {
                     .map(AgreementSummary::getRequestTypes)
                     .filter(Objects::nonNull)
                     .flatMap(List::stream)
-                    .filter(rt -> rt.getTypeCode() != null
-                            && requestTypeCode.equals(String.valueOf(rt.getTypeCode())))
+                    .filter(rt -> requestTypeCode.equals(rt.getTypeCode()))
                     .toList();
         } catch (Exception e) {
             log.warn("Could not resolve request type {} to validate file parameters: {}",
