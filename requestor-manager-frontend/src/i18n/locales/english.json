@@ -689,5 +689,13 @@
     "codeBy": "Code By:",
     "copyright": "© {{year}} Edgemoor Research Institute and Derek Jenkins. Licensed under AGPL-3.0.",
     "sourceCode": "Source code"
+  },
+  "session": {
+    "timeout": {
+      "title": "Still there?",
+      "body": "You have been inactive for a while. For your security this session will end, and any unsaved work will be lost.",
+      "stay": "Stay signed in",
+      "signOut": "Sign out"
+    }
   }
 }

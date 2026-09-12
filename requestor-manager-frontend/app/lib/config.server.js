@@ -21,3 +21,12 @@ export const BACKEND_URL =
  * modified version, point this at the source of YOUR version.
  */
 export const SOURCE_CODE_URL = process.env.SOURCE_CODE_URL || "";
+
+const positiveNumber = (envVar, fallback) => {
+  const parsed = Number(process.env[envVar]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+export const SESSION_IDLE_MINUTES = positiveNumber("SESSION_IDLE_MINUTES", 15);
+
+export const SESSION_WARN_SECONDS = positiveNumber("SESSION_WARN_SECONDS", 120);

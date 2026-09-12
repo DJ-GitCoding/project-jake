@@ -6,8 +6,9 @@
  * Additional terms under AGPL-3.0 Section 7 apply. See NOTICE at the repository root.
  */
 
-import { Outlet } from "react-router";
+import { Outlet, useRouteLoaderData } from "react-router";
 import { requireUser } from "../lib/auth.server.js";
+import SessionTimeout from "../../src/components/SessionTimeout";
 
 export async function loader({ request }) {
   await requireUser(request);
@@ -15,5 +16,14 @@ export async function loader({ request }) {
 }
 
 export default function Protected() {
-  return <Outlet />;
+  const config = useRouteLoaderData("root")?.config;
+  return (
+    <>
+      <Outlet />
+      <SessionTimeout
+        idleMinutes={config?.sessionIdleMinutes}
+        warnSeconds={config?.sessionWarnSeconds}
+      />
+    </>
+  );
 }

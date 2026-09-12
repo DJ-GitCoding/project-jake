@@ -29,7 +29,13 @@ import Footer from "../src/components/Footer";
 import { getSession, getUser, commitSession } from "./lib/session.server.js";
 import { getCsrfToken } from "./lib/csrf.server.js";
 import { getLanguage } from "./lib/i18n.server.js";
-import { KEYCLOAK_ADMIN_URL, APP_VERSION, SOURCE_CODE_URL } from "./lib/config.server.js";
+import {
+  KEYCLOAK_ADMIN_URL,
+  APP_VERSION,
+  SOURCE_CODE_URL,
+  SESSION_IDLE_MINUTES,
+  SESSION_WARN_SECONDS,
+} from "./lib/config.server.js";
 
 // Emit real <link rel="stylesheet"> tags via <Links/> so styles are server-rendered
 // identically in dev and prod (side-effect CSS imports only inject via client JS in dev).
@@ -49,6 +55,8 @@ export async function loader({ request, context }) {
       keycloakAdminUrl: KEYCLOAK_ADMIN_URL,
       appVersion: APP_VERSION,
       sourceCodeUrl: SOURCE_CODE_URL,
+      sessionIdleMinutes: SESSION_IDLE_MINUTES,
+      sessionWarnSeconds: SESSION_WARN_SECONDS,
     },
     csrf,
     cspNonce: context?.cspNonce,

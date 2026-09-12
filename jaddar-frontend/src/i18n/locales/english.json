@@ -771,5 +771,13 @@
     "search": "Search",
     "searchPlaceholder": "Enter domain name or keyword...",
     "searching": "Searching..."
+  },
+  "session": {
+    "timeout": {
+      "title": "Still there?",
+      "body": "You have been inactive for a while. For your security this session will end, and any unsaved work will be lost.",
+      "stay": "Stay signed in",
+      "signOut": "Sign out"
+    }
   }
 }

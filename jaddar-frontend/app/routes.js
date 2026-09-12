@@ -15,6 +15,7 @@ export default [
   route("reset-password", "routes/reset-password.jsx"),
   route("callback", "routes/callback.jsx"),
   route("api/*", "routes/api.$.jsx"),
+  route("session/heartbeat", "routes/session.heartbeat.jsx"),
   route("dh/*", "routes/dh.$.jsx"),
   layout("routes/protected.jsx", [
     index("routes/home.jsx"),
