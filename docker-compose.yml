@@ -443,6 +443,7 @@ services:
     environment:
       - SESSION_SECRET=${SESSION_SECRET:-dev-insecure-change-me-please-32chars}
       - SESSION_IDLE_MINUTES=${SESSION_IDLE_MINUTES:-15}
+      - SESSION_WARN_SECONDS=${SESSION_WARN_SECONDS:-120}
       - SESSION_MAX_HOURS=${SESSION_MAX_HOURS:-8}
       - SESSION_DB_HOST=postgres
       - SESSION_DB_PORT=5432
@@ -645,6 +646,7 @@ services:
       # SSR (React Router v7 framework mode) — server-side config only.
       - SESSION_SECRET=${SESSION_SECRET:-dev-insecure-change-me-please-32chars}
       - SESSION_IDLE_MINUTES=${SESSION_IDLE_MINUTES:-15}
+      - SESSION_WARN_SECONDS=${SESSION_WARN_SECONDS:-120}
       - SESSION_MAX_HOURS=${SESSION_MAX_HOURS:-8}
       - SESSION_DB_HOST=postgres
       - SESSION_DB_PORT=5432
