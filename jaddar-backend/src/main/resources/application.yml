@@ -1,0 +1,123 @@
+server:
+  port: 8000
+
+spring:
+  application:
+    name: jaddar-server
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/jaddar_db}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      # Schema is owned by Flyway; never let Hibernate mutate it.
+      ddl-auto: none
+    open-in-view: false
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    # Baseline at 0, not Flyway's default of 1: an existing non-empty database
+    # would otherwise be stamped at version 1 and skip V1__baseline.sql entirely,
+    # leaving the schema half-created. See V2__baseline_repair.sql.
+    baseline-version: 0
+    locations: classpath:db/migration
+    validate-on-migrate: false
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Validate Keycloak-issued access tokens against the realm JWKS.
+          # Using jwk-set-uri (not issuer-uri) gives signature + expiry checks
+          # WITHOUT issuer/audience validation — matching the FastAPI behaviour
+          # (verify_iss=False, verify_aud=False) since internal vs public issuer differ.
+          jwk-set-uri: ${JADDAR_JWKS_URL:http://keycloak:8080/realms/master}/protocol/openid-connect/certs
+
+# ============================================================================
+# JADDAR application configuration (mirrors the FastAPI env vars)
+# ============================================================================
+jaddar:
+  keycloak-auth-url: ${JADDAR_KEYCLOAK_AUTH_URL:https://keycloak:8443/realms/master}
+  public-auth-url: ${JADDAR_PUBLIC_AUTH_URL:http://localhost:8080/realms/master}
+  client-id: ${JADDAR_CLIENT_ID:jaddar-app}
+  client-secret: ${JADDAR_CLIENT_SECRET:}
+  redirect-uri: ${JADDAR_REDIRECT_URI:http://localhost:3000/callback}
+  web-origin: ${JADDAR_WEB_ORIGIN:http://localhost:3000}
+  admin-email: ${ADMIN_EMAIL:admin@admin.com}
+  requestor-agent-id: ${JADDAR_REQUESTOR_AGENT_ID:JADDAR-001}
+
+  # Rate limiting (requests per minute, per client IP)
+  rate-limit-rpm: ${RATE_LIMIT_RPM:240}
+
+  # Downstream services
+  requestor-manager-url: ${REQUESTOR_MANAGER_SERVER_URL:http://requestor-manager-backend:8081}
+  dataholder-url: ${DATAHOLDER_URL:http://dataholder:8082}
+  dh-group-admin-url: ${DH_GROUP_ADMIN_URL:http://dh-group-admin-backend:8083}
+
+  # Allowed CORS origins (comma-separated; configure per deployment)
+  cors-allowed-origins: ${JADDAR_CORS_ALLOWED_ORIGINS:http://localhost:3000}
+
+  # Public data holder URL(s) that map to the internal dataholder service
+  # (comma-separated; configure per deployment). Used for backend-to-backend rewrites.
+  dataholder-public-urls: ${DATAHOLDER_PUBLIC_URLS:}
+
+  # Password recovery
+  frontend-url: ${JADDAR_FRONTEND_URL:http://localhost:3000}
+  password-reset:
+    expiry-minutes: ${PASSWORD_RESET_EXPIRY_MINUTES:60}
+
+  # ICANN Registration Data Request Service.
+  rdrs:
+    enabled: ${RDRS_ENABLED:true}
+    sidecar-url: ${RDRS_SIDECAR_URL:http://rdrs-sidecar:9700}
+    sidecar-secret: ${RDRS_SIDECAR_SECRET:}
+    config-url: ${RDRS_CONFIG_URL:https://rdrs.icann.org/api/config}
+    config-ttl-seconds: ${RDRS_CONFIG_TTL_SECONDS:3600}
+    session-max-seconds: ${RDRS_SESSION_MAX_SECONDS:3600}
+    mail:
+      enabled: ${RDRS_MAIL_ENABLED:true}
+      domain: ${RDRS_MAIL_DOMAIN}
+      api-base-url: ${MAILGUN_API_BASE_URL:https://api.mailgun.net}
+      api-key: ${MAILGUN_API_KEY:}
+      webhook-signing-key: ${MAILGUN_WEBHOOK_SIGNING_KEY:}
+      poll-interval-seconds: ${RDRS_MAIL_POLL_INTERVAL_SECONDS:120}
+      poll-window-hours: ${RDRS_MAIL_POLL_WINDOW_HOURS:24}
+
+# External Data Holder Registry. The toggle and URL are operator settings stored
+# in the database; this only controls how long a fetched feed is reused.
+registry:
+  cache-seconds: ${REGISTRY_CACHE_SECONDS:300}
+
+# SendGrid (Twilio) transactional email
+sendgrid:
+  api-key: ${SENDGRID_API_KEY:}
+  from-email: ${SENDGRID_FROM_EMAIL:}
+  from-name: ${SENDGRID_FROM_NAME:Jaddar}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    com.jaddar: INFO

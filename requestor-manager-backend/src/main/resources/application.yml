@@ -1,0 +1,130 @@
+spring:
+  application:
+    name: requestor-manager
+  
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${REQUESTOR_MANAGER_DB_NAME:agreement_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: false
+
+  servlet:
+    multipart:
+      max-file-size: 4MB
+      max-request-size: 4MB
+
+  task:
+    scheduling:
+      pool:
+        size: ${TASK_SCHEDULING_POOL_SIZE:3}
+
+server:
+  port: ${SERVER_PORT:8081}
+
+# Disabled by default so a lone service can run without the cert chain (local dev).
+
+# Swagger Configuration
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha
+
+# Keycloak Configuration (for authentication)
+keycloak:
+  introspect-url: ${KEYCLOAK_INTROSPECT_URL:http://keycloak:8080/realms/master/protocol/openid-connect/token/introspect}
+  token-url: ${KEYCLOAK_TOKEN_URL:http://keycloak:8080/realms/master/protocol/openid-connect/token}
+  admin-url: ${KEYCLOAK_ADMIN_URL:http://keycloak:8080/admin/realms/master}
+  client-id: ${KEYCLOAK_CLIENT_ID:jaddar-app}
+  client-secret: ${KEYCLOAK_CLIENT_SECRET}
+  # Admin credentials for user management
+  admin-username: ${KEYCLOAK_ADMIN_USERNAME}
+  admin-password: ${KEYCLOAK_ADMIN_PASSWORD}
+  # Periodic reconciliation of requestor groups into Keycloak. RM is the source of
+  # truth; this re-creates any group deleted directly on Keycloak. Runs hourly on
+  # the hour (Spring 6-field cron: sec min hour day month weekday).
+  group-sync:
+    enabled: ${KEYCLOAK_GROUP_SYNC_ENABLED:true}
+    cron: ${KEYCLOAK_GROUP_SYNC_CRON:0 0 * * * *}
+
+# Automated post-approval subscription workflow. Once a data holder approves a subscription,
+# the RM auto-advances it APPROVED → TESTING → (run tests) → ACTIVE, one transition per tick so
+# the UI's status polling can show testing "in progress". See SubscriptionAutoAdvanceScheduler.
+subscription:
+  auto-advance:
+    enabled: ${SUBSCRIPTION_AUTO_ADVANCE_ENABLED:true}
+    # Delay between ticks (ms). Keep >= the frontend poll interval (5s) so each state is visible.
+    interval-ms: ${SUBSCRIPTION_AUTO_ADVANCE_INTERVAL_MS:10000}
+    initial-delay-ms: ${SUBSCRIPTION_AUTO_ADVANCE_INITIAL_DELAY_MS:15000}
+    # System identity recorded as the actor for automated transitions.
+    actor: ${SUBSCRIPTION_AUTO_ADVANCE_ACTOR:system@auto-advance}
+
+  credential-sync:
+    enabled: ${SUBSCRIPTION_CREDENTIAL_SYNC_ENABLED:true}
+    # Offset from the top of the hour so it does not contend with the requestor-group sync.
+    cron: ${SUBSCRIPTION_CREDENTIAL_SYNC_CRON:0 30 * * * *}
+    # Also reconcile once shortly after startup, so a freshly-started stack self-heals instead of
+    # waiting for the next cron tick.
+    run-on-startup: ${SUBSCRIPTION_CREDENTIAL_SYNC_ON_STARTUP:true}
+    # Delay before the startup pass. Long enough for the group admin to start accepting requests —
+    # reconciliation skips subscriptions it cannot get an answer for, so running too early is a no-op.
+    startup-delay-seconds: ${SUBSCRIPTION_CREDENTIAL_SYNC_STARTUP_DELAY_SECONDS:60}
+
+# SendGrid (Twilio) email — password recovery
+sendgrid:
+  api-key: ${SENDGRID_API_KEY:}
+  from-email: ${SENDGRID_FROM_EMAIL:}
+  from-name: ${SENDGRID_FROM_NAME:Requestor Manager}
+
+# Password recovery
+# AES-256-GCM key material for encrypting sensitive columns at rest (per-subscription
+# introspection client secrets). Falls back to keycloak.client-secret so existing deployments keep
+# working, but set this explicitly: rotating the Keycloak client secret would otherwise leave stored
+# credentials undecryptable, forcing a re-provision. See EncryptedStringConverter.
+requestor-manager:
+  encryption-key: ${REQUESTOR_MANAGER_ENCRYPTION_KEY:}
+
+app:
+  frontend-url: ${REQUESTOR_MANAGER_FRONTEND_URL:http://localhost:3000}
+  password-reset:
+    expiry-minutes: ${PASSWORD_RESET_EXPIRY_MINUTES:60}
+
+# Actuator for health checks
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.requestormanager: ${LOG_LEVEL:INFO}
+    com.requestormanager.security: DEBUG
+    org.springframework.security: INFO
+registry:
+  directory:
+    cache-seconds: ${REGISTRY_DIRECTORY_CACHE_SECONDS:300}
+    timeout-seconds: ${REGISTRY_DIRECTORY_TIMEOUT_SECONDS:10}
+    sync-interval-ms: ${REGISTRY_DIRECTORY_SYNC_INTERVAL_MS:900000}
+    sync-initial-delay-ms: ${REGISTRY_DIRECTORY_SYNC_INITIAL_DELAY_MS:60000}

@@ -1,0 +1,1405 @@
+{
+  "common": {
+    "actions": "Actions",
+    "active": "Active",
+    "add": "Add",
+    "all": "All",
+    "allGroups": "All Groups",
+    "cancel": "Cancel",
+    "clear": "Clear",
+    "clickToToggle": "Click to toggle",
+    "close": "Close",
+    "confirm": "Confirm",
+    "create": "Create",
+    "delete": "Delete",
+    "deleteConfirmPrefix": "Are you sure you want to delete",
+    "deleteFailed": "Delete failed",
+    "deleting": "Deleting...",
+    "description": "Description",
+    "disabled": "Disabled",
+    "done": "Done",
+    "edit": "Edit",
+    "email": "Email",
+    "failed": "Failed",
+    "inactive": "Inactive",
+    "logout": "Logout",
+    "name": "Name",
+    "none": "None",
+    "ok": "OK",
+    "password": "Password",
+    "phone": "Phone",
+    "processing": "Processing...",
+    "refresh": "Refresh",
+    "remove": "Remove",
+    "required": "Required",
+    "save": "Save",
+    "saveFailed": "Save failed",
+    "saving": "Saving...",
+    "search": "Search",
+    "status": "Status",
+    "type": "Type",
+    "update": "Update",
+    "view": "View",
+    "master": "Master",
+    "admin": "Admin",
+    "user": "User",
+    "yes": "Yes",
+    "no": "No",
+    "loading": "Loading..."
+  },
+  "header": {
+    "actingAs": "Acting as",
+    "signOut": "Sign Out",
+    "toggleNav": "Toggle navigation",
+    "groupSelector": {
+      "allGroups": "All Groups",
+      "noGroups": "No groups assigned"
+    },
+    "menus": {
+      "agreements": "Agreements",
+      "directory": "Directory",
+      "admin": "Admin"
+    },
+    "nav": {
+      "dashboard": "Dashboard",
+      "subscriptions": "Subscriptions",
+      "templates": "Templates",
+      "dataHolders": "Data Holders",
+      "applications": "Applications",
+      "requestorGroups": "Requestor Groups",
+      "dhGroups": "DH Groups",
+      "instances": "Instances",
+      "users": "Users",
+      "auditLogs": "Audit Logs",
+      "settings": "Settings"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Deployment-wide settings for this Group Admin instance.",
+    "tabs": {
+      "branding": "Logo",
+      "commonRepository": "Common Repository"
+    }
+  },
+  "branding": {
+    "title": "Logo",
+    "description": "Upload your own logo to replace the default one on the login screen and in the header. Remove it at any time to go back to the default.",
+    "previewAlt": "Current logo",
+    "usingDefault": "Default",
+    "loading": "Loading...",
+    "customLogo": "Your logo",
+    "defaultLogo": "Default logo",
+    "requirements": "PNG, JPEG, GIF or WebP, up to 2 MB. A wide image with a transparent background works best.",
+    "masterOnly": "Only master administrators can change the logo.",
+    "notices": {
+      "title": "Login notices",
+      "description": "Extra wording shown under the sign-in form — a privacy notice, acceptable-use statement, a link to your terms. Nothing is shown until you add an entry.",
+      "none": "No login notices are defined.",
+      "empty": "No notices yet. Add one to show text under the sign-in form.",
+      "textLabel": "Text",
+      "textPlaceholder": "e.g. Access is monitored and logged",
+      "urlLabel": "Link (optional)",
+      "add": "Add notice",
+      "save": "Save notices",
+      "saving": "Saving...",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "removeItem": "Remove",
+      "hint": "Up to {{max}} entries, shown in this order. Add a link to turn the text into a link; leave it blank for plain text.",
+      "toast": {
+        "saved": "Login notices updated",
+        "saveFailed": "Failed to save the login notices"
+      }
+    },
+    "meta": {
+      "file": "File",
+      "size": "Size",
+      "updatedBy": "Uploaded by",
+      "updatedAt": "Uploaded"
+    },
+    "actions": {
+      "upload": "Upload logo",
+      "replace": "Replace logo",
+      "remove": "Remove"
+    },
+    "errors": {
+      "unsupportedType": "Unsupported image type. Use a PNG, JPEG, GIF or WebP file.",
+      "tooLarge": "That image is too large. Logos must be 2 MB or smaller."
+    },
+    "toast": {
+      "uploaded": "Logo updated",
+      "uploadFailed": "Failed to upload the logo",
+      "removed": "Logo removed — using the default",
+      "removeFailed": "Failed to remove the logo"
+    }
+  },
+  "dataHolderApplications": {
+    "title": "Data Holder Applications",
+    "subtitle": "Review applications from organizations wanting to join a data holder group.",
+    "searchPlaceholder": "Search org, contact, TLDs...",
+    "loading": "Loading applications...",
+    "empty": "No {{filter}} applications found.",
+    "itemLabel": "applications",
+    "groupFallback": "Group #{{id}}",
+    "status": {
+      "PENDING": "Pending",
+      "APPROVED": "Approved",
+      "DENIED": "Denied"
+    },
+    "toast": {
+      "loadFailed": "Failed to load applications",
+      "approved": "Application approved!",
+      "denied": "Application denied",
+      "actionFailed": "Action failed",
+      "deleted": "Application deleted",
+      "deleteFailed": "Delete failed",
+      "copied": "{{label}} copied",
+      "copyFailed": "Copy failed"
+    },
+    "table": {
+      "organization": "Organization",
+      "contact": "Contact",
+      "group": "Group",
+      "tlds": "TLDs",
+      "submitted": "Submitted"
+    },
+    "actions": {
+      "viewDetails": "View Details",
+      "approve": "Approve",
+      "deny": "Deny"
+    },
+    "detail": {
+      "title": "Application — {{name}}",
+      "organization": "Organization",
+      "address": "Address",
+      "adminContact": "Admin Contact",
+      "fullName": "Full Name",
+      "contactTitle": "Title",
+      "rdapServers": "RDAP Servers",
+      "supportedTlds": "Supported TLDs",
+      "additionalNotes": "Additional Notes",
+      "review": "Review",
+      "reviewLine": "{{action}} by {{reviewer}} on {{date}}",
+      "reviewApproved": "Approved",
+      "reviewDenied": "Denied",
+      "submitted": "Submitted: {{date}}"
+    },
+    "action": {
+      "approveTitle": "Approve Application",
+      "denyTitle": "Deny Application",
+      "approvedHeading": "Application Approved",
+      "createdPrefix": "Data holder",
+      "createdSuffix": "has been created. Copy the credentials below — the data holder will need them to connect.",
+      "clientId": "Client ID",
+      "clientSecret": "Client Secret",
+      "approvePrefix": "Approve the application from",
+      "approveSuffix": "? This will create a new data holder and generate credentials.",
+      "denyPrefix": "Deny the application from",
+      "denySuffix": "?",
+      "reviewNotesLabel": "Review Notes (optional)",
+      "approveNotesPlaceholder": "Optional notes about the approval...",
+      "denyNotesPlaceholder": "Reason for denial (will be recorded)...",
+      "done": "Done"
+    },
+    "delete": {
+      "title": "Delete Application",
+      "confirmPrefix": "Are you sure you want to delete the application from",
+      "confirmSuffix": "?",
+      "cannotUndo": "This action cannot be undone."
+    }
+  },
+  "instances": {
+    "title": "Data Holder Instances",
+    "loading": "Loading instances...",
+    "searchPlaceholder": "Search name, subdomain...",
+    "updateAll": "Update All",
+    "updatingAll": "Updating...",
+    "newInstance": "New Instance",
+    "emptyState": "No data holder instances yet.",
+    "createFirst": "Create First Instance",
+    "itemLabel": "instances",
+    "status": {
+      "running": "running",
+      "stopped": "stopped",
+      "destroyed": "destroyed"
+    },
+    "header": {
+      "summary": "{{count}} {{unit}} · {{running}} running on this page",
+      "unitSingular": "instance",
+      "unitPlural": "instances"
+    },
+    "toast": {
+      "loadFailed": "Failed to load instances",
+      "created": "Instance \"{{name}}\" created at {{url}}",
+      "provisioningFailed": "Provisioning failed",
+      "actionSuccess": "{{label}} successful",
+      "actionFailed": "{{label}} failed",
+      "updatedCount": "Updated {{count}} instance(s)",
+      "updatedFailed": ", {{count}} failed",
+      "batchUpdateFailed": "Batch update failed"
+    },
+    "confirm": {
+      "updateAll": "This will restart all running instances with the latest Docker images. Continue?",
+      "stop": "Stop \"{{name}}\"? Users will lose access.",
+      "update": "Update \"{{name}}\" to latest image version?",
+      "teardown": "PERMANENTLY DELETE \"{{name}}\"?\n\nThis will:\n• Stop and remove containers\n• Drop the database and ALL data\n• Remove the Nginx config\n\nThis action cannot be undone."
+    },
+    "actions": {
+      "stop": "Stop",
+      "start": "Start",
+      "teardown": "Teardown"
+    },
+    "card": {
+      "detailsTitle": "Details",
+      "created": "Created {{date}}"
+    },
+    "form": {
+      "title": "New Data Holder Instance",
+      "nameLabel": "Data Holder Name",
+      "namePlaceholder": "e.g. Example Data Holder",
+      "subdomainLabel": "Subdomain",
+      "subdomainPlaceholder": "e.g. example",
+      "subdomainHint": "Will be accessible at {{url}}",
+      "subdomainInvalid": "3–30 lowercase letters, numbers, hyphens",
+      "groupsLabel": "Data Holder Groups",
+      "groupsRequired": "Select at least one group",
+      "dataHolderIdLabel": "Data Holder ID",
+      "dataHolderIdHint": "Unique identifier for this data holder",
+      "autoGeneratePlaceholder": "Leave blank to auto-generate",
+      "adminPasswordLabel": "Admin Password",
+      "adminPasswordHint": "Password for the data holder admin panel",
+      "provisioningInfo": "This will create a new PostgreSQL database, spin up backend and frontend Docker containers, configure Nginx for the subdomain, and obtain an SSL certificate. The process takes about 30–60 seconds.",
+      "provisioning": "Provisioning...",
+      "createInstance": "Create Instance"
+    },
+    "detail": {
+      "url": "URL",
+      "subdomain": "Subdomain",
+      "dataHolderId": "Data Holder ID",
+      "groups": "Groups",
+      "database": "Database",
+      "backendPort": "Backend Port",
+      "frontendPort": "Frontend Port",
+      "backendContainer": "Backend Container",
+      "frontendContainer": "Frontend Container",
+      "adminUsername": "Admin Username",
+      "adminPassword": "Admin Password",
+      "hide": "Hide",
+      "show": "Show",
+      "backendImage": "Backend Image",
+      "frontendImage": "Frontend Image",
+      "created": "Created",
+      "liveStatusHeading": "Live container status",
+      "liveStatusError": "Could not fetch live status",
+      "image": "Image: {{image}}"
+    }
+  },
+  "login": {
+    "subtitle": "Data Holder Group Administration",
+    "emailPlaceholder": "you@yourorganization.com",
+    "signingIn": "Signing in...",
+    "signIn": "Sign In",
+    "forgotPassword": "Forgot password?",
+    "welcome": "Welcome, {{name}}!",
+    "validation": {
+      "required": "Email and password are required"
+    },
+    "errors": {
+      "loginFailed": "Login failed",
+      "invalidCredentials": "Invalid email or password"
+    },
+    "sessionExpired": "Your session has expired. Please sign in again."
+  },
+  "forgotPassword": {
+    "genericMessage": "If an account with that email exists, a reset link has been sent.",
+    "title": "Forgot Password",
+    "subtitle": "Enter your email to receive a reset link",
+    "emailPlaceholder": "you@yourorganization.com",
+    "sending": "Sending...",
+    "sendResetLink": "Send Reset Link",
+    "backToSignIn": "Back to Sign In"
+  },
+  "resetPassword": {
+    "title": "Reset Password",
+    "subtitle": "Choose a new password for your account",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password",
+    "resetting": "Resetting...",
+    "resetPassword": "Reset Password",
+    "backToSignIn": "Back to Sign In",
+    "validation": {
+      "passwordTooShort": "Password must be at least 8 characters.",
+      "passwordsDoNotMatch": "Passwords do not match."
+    },
+    "errors": {
+      "resetFailed": "Unable to reset password. The link may have expired."
+    },
+    "invalidLink": {
+      "title": "Invalid Link",
+      "body": "This password reset link is invalid or incomplete. Please request a new one.",
+      "requestNew": "Request a New Link"
+    },
+    "success": {
+      "title": "Password Reset",
+      "body": "Your password has been reset. Redirecting to sign in..."
+    }
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Jaremin Overview",
+    "viewAll": "View All",
+    "errors": {
+      "loadFailed": "Failed to load dashboard data"
+    },
+    "stats": {
+      "totalTemplates": "Total Templates",
+      "activeTemplates": "Active Templates",
+      "globallyPublished": "Globally Published",
+      "totalSubscriptions": "Total Subscriptions",
+      "dataHolders": "Data Holders",
+      "pending": "Pending",
+      "approved": "Approved",
+      "testing": "Testing",
+      "suspended": "Suspended",
+      "denied": "Denied",
+      "dhGroups": "DH Groups",
+      "activeGroups": "Active Groups",
+      "totalUsers": "Total Users"
+    },
+    "pendingSubscriptions": {
+      "title": "Pending Subscriptions",
+      "empty": "No pending subscriptions"
+    },
+    "table": {
+      "requestId": "Request ID",
+      "requestor": "Requestor Group",
+      "template": "Template",
+      "dataHolder": "Data Holder",
+      "created": "Created",
+      "dataHolderGroup": "Data Holder Group"
+    },
+    "charts": {
+      "subscriptionsByStatus": "Subscriptions by Status",
+      "estate": "Templates & Infrastructure",
+      "noData": "Nothing to chart yet",
+      "templates": "Templates",
+      "dataHolders": "Data Holders",
+      "dhGroups": "DH Groups",
+      "instances": "Instances",
+      "live": "Active",
+      "idle": "Inactive"
+    },
+    "kpi": {
+      "activeCount": "{{count}} active",
+      "publishedCount": "{{count}} globally published",
+      "needsReview": "Awaiting review",
+      "allClear": "Nothing awaiting review"
+    }
+  },
+  "templates": {
+    "title": "Agreement Templates",
+    "count": "{{count}} templates",
+    "searchPlaceholder": "Search name, ID...",
+    "newTemplate": "New Template",
+    "noGroups": "You are not a member of any data holder group.",
+    "chooseGroup": {
+      "title": "Which data holder group?",
+      "help": "An agreement belongs to one data holder group and stays there, so choose the one it is for. You are viewing all groups, so there is nothing to take it from."
+    },
+    "copy": {
+      "button": "Copy agreement",
+      "buttonTitle": "Start from an agreement this group can see",
+      "title": "Copy an agreement",
+      "help": "Your own agreements, and those other data holder groups publish widely enough for you to see. A copy belongs to your group: it starts private and inactive, with your group's contact, so you can adjust it before publishing.",
+      "searchPlaceholder": "Search by name, description or group…",
+      "none": "No agreement is available to copy.",
+      "ownGroup": "Your group",
+      "counts": "{{requestTypes}} request types · {{sections}} legal sections · {{fields}} requestor fields",
+      "action": "Copy",
+      "copying": "Copying…",
+      "copied": "Copied \"{{name}}\" into your group",
+      "failed": "The agreement could not be copied",
+      "loadFailed": "Could not load the agreements available to copy"
+    },
+    "empty": "No templates yet. Create one to get started.",
+    "any": "Any",
+    "itemLabel": "templates",
+    "accessLevels": {
+      "public": "Public",
+      "basic": "Basic",
+      "enhanced": "Enhanced",
+      "full": "Full"
+    },
+    "requestType": {
+      "exigent": "Exigent",
+      "confidential": "Confidential",
+      "standard": "Standard"
+    },
+    "customParameters": {
+      "singular": "{{count}} custom parameter",
+      "plural": "{{count}} custom parameters"
+    },
+    "stats": {
+      "total": "Total",
+      "activePage": "Active (page)",
+      "inactivePage": "Inactive (page)",
+      "globalPage": "Global (page)"
+    },
+    "table": {
+      "templateId": "Template ID",
+      "group": "Group",
+      "requestTypes": "Request Types",
+      "requiredGroups": "Intended Requestors",
+      "visibility": "Visibility"
+    },
+    "toasts": {
+      "created": "Template created",
+      "updated": "Template updated",
+      "deleted": "Template deleted",
+      "activated": "Template activated",
+      "deactivated": "Template deactivated",
+      "deactivatedWithSubscriptions": "Template deactivated. {{count}} subscription(s) already in place are unaffected.",
+      "visibility": {
+        "private": "Template is now private",
+        "public": "Template is now public",
+        "global": "Template is now globally published"
+      }
+    },
+    "errors": {
+      "loadFailed": "Failed to load templates",
+      "failed": "Failed",
+      "saveFailed": "Save failed",
+      "deleteFailed": "Delete failed",
+      "toggleActiveFailed": "Could not change the template status",
+      "visibilityFailed": "Could not change the template visibility"
+    },
+    "deleteModal": {
+      "title": "Delete Template",
+      "confirmPrefix": "Are you sure you want to delete",
+      "templateIdLabel": "Template ID:"
+    },
+    "publishChanges": {
+      "action": "Publish changes to subscribers",
+      "title": "Publish changes — {{name}}",
+      "help": "Forced changes must be accepted by the deadline below or the subscription is terminated. Proposed changes are optional: the subscription stays exactly as it is unless the requestor accepts.",
+      "noSubscribers": "No active subscriptions to this template.",
+      "subscriber": "Subscriber",
+      "state": "State",
+      "mode": "Apply as",
+      "force": "Force",
+      "propose": "Propose",
+      "allForce": "Force all",
+      "allPropose": "Propose to all",
+      "awaiting": "Awaiting response",
+      "outOfDate": "Older copy",
+      "upToDate": "Up to date",
+      "apply": "Apply",
+      "respondBy": "Forced changes must be accepted within",
+      "respondByHint": "days, or the subscription is terminated."
+    },
+    "active": "Active",
+    "inactive": "Inactive",
+    "clickToActivate": "Click to activate — the agreement starts accepting new subscriptions",
+    "clickToDeactivate": "Click to deactivate — no new subscriptions; those already in place carry on unchanged",
+    "visibility": {
+      "private": "Private",
+      "public": "Public",
+      "global": "Globally published",
+      "privateHint": "Not listed anywhere. Only someone who already knows the template ID, or who is already subscribed, can reach it.",
+      "publicHint": "Listed when someone looks this data holder group up. Not sent to the common repository.",
+      "globalHint": "Listed here and published to the common repository, where any Jadmin can discover it."
+    }
+  },
+  "joinGroup": {
+    "backToJaremin": "Back to Jaremin",
+    "errors": {
+      "loadGroups": "Failed to load data holder groups. Please try again later."
+    },
+    "validation": {
+      "selectGroup": "Please select a data holder group",
+      "enterGroupName": "Please enter a data holder group name",
+      "organizationNameRequired": "Organization name is required",
+      "contactFullNameRequired": "Admin contact full name is required",
+      "contactEmailRequired": "Admin contact email is required",
+      "rdapRequired": "At least one RDAP server URL is required",
+      "tldRequired": "At least one supported TLD is required"
+    },
+    "toasts": {
+      "submitSuccess": "Application submitted successfully!",
+      "submitFailed": "Submission failed",
+      "submitFailedRetry": "Submission failed. Please try again."
+    },
+    "success": {
+      "title": "Application Submitted",
+      "messagePrefix": "Your application to join the data holder group has been submitted successfully. An administrator will review your application and contact you at",
+      "applicationId": "Application ID",
+      "submitAnother": "Submit Another",
+      "home": "Home"
+    },
+    "header": {
+      "title": "Join a Data Holder Group",
+      "subtitle": "Submit your application to become a member of a data holder group. An administrator will review your application."
+    },
+    "form": {
+      "dataHolderGroup": "Data Holder Group",
+      "loadingGroups": "Loading groups...",
+      "selectGroup": "Select a group...",
+      "groupNamePlaceholder": "Enter the exact group name...",
+      "groupNameHelp": "Enter the exact name of the private group you wish to join.",
+      "selectFromAvailable": "Select from available groups",
+      "enterManually": "Know a private group name? Enter it manually"
+    },
+    "organization": {
+      "sectionTitle": "Organization Information",
+      "name": "Organization Name",
+      "namePlaceholder": "e.g. Acme Registry Inc.",
+      "address": "Organization Address",
+      "addressPlaceholder": "Street address, city, state/province, postal code, country",
+      "phone": "Organization Phone"
+    },
+    "contact": {
+      "sectionTitle": "Organization Admin Contact",
+      "fullName": "Full Name",
+      "title": "Title / Role",
+      "titlePlaceholder": "e.g. CTO, Registry Admin",
+      "phone": "Phone"
+    },
+    "rdap": {
+      "sectionTitle": "RDAP Server URLs",
+      "help": "Provide the URL(s) of your RDAP servers. At least one is required.",
+      "addServer": "Add Another RDAP Server"
+    },
+    "tld": {
+      "sectionTitle": "Supported TLDs",
+      "helpBefore": "List each TLD your organization supports. Include the leading dot (e.g. ",
+      "helpAfter": "). At least one is required.",
+      "addTld": "Add TLD"
+    },
+    "notes": {
+      "label": "Additional Notes",
+      "placeholder": "Anything else you'd like the group admin to know about your organization..."
+    },
+    "submit": {
+      "submitting": "Submitting Application...",
+      "submit": "Submit Application",
+      "disclaimer": "Your application will be reviewed by an administrator. You will be contacted at the email provided above."
+    }
+  },
+  "auditLogs": {
+    "title": "Audit Logs",
+    "eventsLogged": "{{count}} events logged",
+    "inLast24h": "{{count}} in the last 24h",
+    "clearFilters": "Clear Filters",
+    "failures": "Failures",
+    "searchPlaceholder": "entity name, id, details...",
+    "itemLabel": "audit logs",
+    "errors": {
+      "load": "Failed to load audit logs"
+    },
+    "time": {
+      "justNow": "just now",
+      "minutesAgo": "{{count}}m ago",
+      "hoursAgo": "{{count}}h ago",
+      "yesterday": "yesterday"
+    },
+    "fields": {
+      "time": "Time",
+      "category": "Category",
+      "action": "Action",
+      "entity": "Entity",
+      "entityType": "Entity Type",
+      "entityId": "Entity ID",
+      "entityName": "Entity Name",
+      "performedBy": "Performed By",
+      "result": "Result",
+      "details": "Details",
+      "timestamp": "Timestamp",
+      "source": "Source",
+      "ipAddress": "IP Address"
+    },
+    "empty": {
+      "noMatch": "No logs match the current filters",
+      "noLogs": "No audit logs yet"
+    },
+    "detail": {
+      "title": "Audit Log #{{id}}"
+    }
+  },
+  "multiGroupSelect": {
+    "selectPlaceholder": "Select groups…",
+    "noGroupsAvailable": "No groups available"
+  },
+  "pagination": {
+    "items": "items",
+    "none": "No {{itemLabel}}",
+    "showing": "Showing {{from}}–{{to}} of {{total}} {{itemLabel}}",
+    "show": "Show",
+    "itemsPerPage": "Items per page",
+    "label": "Pagination",
+    "firstPage": "First page",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "lastPage": "Last page"
+  },
+  "subscriptions": {
+    "title": "Subscriptions",
+    "totalCount": "{{count}} total",
+    "searchPlaceholder": "Search request, requestor, DH, template...",
+    "clearSearch": "Clear",
+    "empty": "No subscriptions found",
+    "itemLabel": "subscriptions",
+    "workflow": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "testing": "Testing"
+    },
+    "actions": {
+      "approve": "Approve",
+      "deny": "Deny",
+      "startTest": "Start Test",
+      "runTest": "Run Test",
+      "activate": "Activate",
+      "suspend": "Suspend",
+      "reactivate": "Reactivate"
+    },
+    "table": {
+      "requestId": "Request ID",
+      "requestor": "Requestor Group",
+      "template": "Template",
+      "dataHolder": "Data Holder",
+      "test": "Test",
+      "created": "Created",
+      "dataHolderGroup": "Data Holder Group"
+    },
+    "testPanel": {
+      "title": "Testing Phase",
+      "awaiting": "Awaiting test execution",
+      "testsPassed": "Tests Passed",
+      "testsFailed": "Tests Failed",
+      "testing": "Testing",
+      "runTest": "Run Test",
+      "rerunTests": "Re-run Tests",
+      "runningTests": "Running Tests...",
+      "markPassed": "Mark Passed",
+      "markFailed": "Mark Failed",
+      "markPassedTitle": "Manually mark tests as passed",
+      "markFailedTitle": "Manually mark tests as failed",
+      "allPassed": "All tests passed",
+      "failed": "Tests failed",
+      "whatWasTested": "What was tested",
+      "answeredBy": "Retrieval tested by {{name}}",
+      "noDataHolderAnswered": "No data holder in this group ran a retrieval test",
+      "rdapSummary": "{{passed}}/{{total}} queries passed",
+      "noQueriesRun": "No RDAP queries were run.",
+      "failedChecks": "Checks that did not pass",
+      "levelBadge": "L{{level}}",
+      "durationMs": "{{ms}} ms",
+      "expectedActual": "expected {{expected}} · got {{actual}}",
+      "activated": "activated",
+      "guidanceAwaiting": {
+        "p1": "The subscription is in",
+        "p2": "status. Tests run automatically on approval; if that run did not complete, click",
+        "p3": "below. The subscription activates as soon as the tests pass."
+      },
+      "guidancePassed": {
+        "p1": "All tests passed and the subscription was",
+        "p2": " automatically. The results below are kept for review."
+      },
+      "guidanceFailed": "Tests did not pass. Review the details below and re-run the tests after correcting any issues; the subscription activates automatically once they pass. You can also manually set the result.",
+      "guidanceRecorded": "The results of the last test run, kept for review."
+    },
+    "detail": {
+      "live": "Live",
+      "testLabel": "Test: {{result}}",
+      "subscriptionSection": "Subscription",
+      "requestorSection": "Requestor Group",
+      "purpose": "Purpose",
+      "introspectionUrl": "Introspection URL",
+      "introspectionUrlPlaceholder": "https://auth.example.com/.../token/introspect",
+      "notProvided": "Not provided",
+      "editIntrospectionUrl": "Edit introspection URL",
+      "effectiveFrom": "Effective From",
+      "effectiveTo": "Effective To",
+      "noExpiry": "No expiry",
+      "group": "Group",
+      "groupId": "Group ID",
+      "contact": "Contact",
+      "organization": "Organization",
+      "address": "Address",
+      "testResultsHeader": "Test Results",
+      "resultLabel": "Result: {{result}}",
+      "notYetRun": "Not yet run",
+      "started": "Started:",
+      "completed": "Completed:",
+      "reviewSection": "Review",
+      "reviewedBy": "Reviewed by",
+      "reviewedAt": "at",
+      "statusHistory": "Status History",
+      "runBeforeActivate": "Run tests before activating",
+      "readyToActivate": "Ready to activate",
+      "pendingGuidance": {
+        "p1": "This subscription is awaiting review.",
+        "or": "or",
+        "p2": "it using the buttons below."
+      },
+      "approvedGuidance": {
+        "p1": "Subscription approved. Click",
+        "p2": "below to begin the testing phase. Either side (admin or requestor) can initiate this."
+      },
+      "requestExpires": "Request expires",
+      "activated": "Activated",
+      "queryLimits": "Query limits",
+      "perDay": "{{count}}/day",
+      "perMonth": "{{count}}/month",
+      "statusMessage": "Status message",
+      "groupCode": "Group code",
+      "callbackUrl": "Callback URL",
+      "changeProposed": "A change to these terms is awaiting the requestor group's response.",
+      "changeDeadline": "Must be accepted by {{date}}",
+      "changeDeclined": "The requestor group declined the proposed change; this subscription is unchanged.",
+      "changeExpired": "A required change was not accepted before its deadline."
+    },
+    "actionModal": {
+      "subscriptionFor": "Subscription for",
+      "startTestInfo": "Starts the test phase for a subscription whose automatic test did not run. Tests can then be run from the subscription's details; the subscription activates once they pass.",
+      "activateInfo": "Tests have passed. Activating will make this agreement live. The requestor will gain full access.",
+      "reasonLabel": "Reason *",
+      "reasonPlaceholder": "Provide a reason...",
+      "notesLabel": "Notes (optional)"
+    },
+    "toast": {
+      "loadFailed": "Failed to load",
+      "testResultReceived": "Test result received: {{result}}",
+      "statusChanged": "Status changed to: {{status}}",
+      "testResultRecorded": "Test result recorded: {{result}}",
+      "recordResultFailed": "Failed to record result",
+      "testsExecuted": "Tests executed: {{result}}",
+      "testExecutionFailed": "Test execution failed",
+      "testFailed": "Test failed",
+      "actionSuccessful": "{{action}} successful",
+      "approvedAndActivated": "Approved — tests passed and the subscription is active",
+      "approvedTestsFailed": "Approved, but the automatic tests did not pass — review the results",
+      "actionFailed": "Action failed",
+      "introspectionUrlUpdated": "Introspection URL updated",
+      "updateFailed": "Failed to update",
+      "introspectionUrlUpdateFailed": "Failed to update introspection URL"
+    },
+    "terms": {
+      "title": "Agreement terms in force",
+      "proposedTitle": "Proposed agreement terms",
+      "inForceSince": "These are the terms this subscription runs under, pinned at {{date}}. Editing the template does not change them.",
+      "proposedNotice": "These terms replace the ones currently in force only if the requestor group accepts them.",
+      "proposedNoticeRequired": "These terms are required. They replace the ones currently in force when the requestor group accepts, and the subscription is terminated if they have not accepted by {{date}}.",
+      "proposedSince": "Proposed {{date}}",
+      "viewInForce": "In force",
+      "viewProposed": "Proposed",
+      "noSections": "This agreement has no data holder group fields.",
+      "acceptedOn": "Accepted {{date}}",
+      "notAccepted": "Not accepted",
+      "documents": "Documents for review",
+      "reviewed": "Reviewed",
+      "notReviewed": "Not acknowledged",
+      "dataHolderGroupFields": "Data Holder Group Fields",
+      "requestorGroupFields": "Requestor Group Fields",
+      "requestTypes": "Request types",
+      "accessLevel": "Level {{level}}",
+      "noAcceptanceRecord": "This subscription predates per-section acceptance records; the requestor group accepted the agreement as a whole."
+    },
+    "credentials": {
+      "title": "Credentials",
+      "generate": "Generate credentials",
+      "regenerate": "Regenerate credentials",
+      "clientId": "Client ID",
+      "clientSecret": "Client Secret",
+      "none": "No credentials have been generated for this subscription yet.",
+      "generated": "New credentials generated",
+      "failed": "Could not generate credentials",
+      "secretNotRetrievable": "For security, the client secret is only shown once when generated. Use “Regenerate credentials” to issue a new secret.",
+      "lastUsed": "Last used {{date}}",
+      "info": "The requestor manager uses these credentials to connect to this Group Admin for this subscription.",
+      "copied": "{{label}} copied",
+      "copyFailed": "Could not copy to clipboard",
+      "publicKey": "Request Signing Key",
+      "publicKeyHelp": "Paste the public key the requestor manager generated for this subscription. Signed requests are verified against it; nothing secret is stored.",
+      "publicKeyPlaceholder": "MCowBQYDK2Vw...",
+      "registerKey": "Register",
+      "keyOnFile": "A signing key has been registered ({{date}})",
+      "noKey": "No signing key registered yet — this subscription cannot use signed requests.",
+      "keyRegistered": "Public key registered",
+      "keyFailed": "Could not register that public key"
+    }
+  },
+  "users": {
+    "title": "Users",
+    "count": "{{count}} users",
+    "searchPlaceholder": "Search name or email...",
+    "addUser": "Add User",
+    "editUser": "Edit User",
+    "createUser": "Create User",
+    "deleteUser": "Delete User",
+    "empty": "No users yet",
+    "you": "You",
+    "allGroups": "All Groups",
+    "insufficientPermissions": "Insufficient permissions",
+    "groups": "Groups",
+    "created": "Created",
+    "itemLabel": "users",
+    "memberOf": "Member of: {{groups}}",
+    "deleteWarning": "This will also remove all group memberships for this user.",
+    "typePlural": {
+      "master": "Masters",
+      "admin": "Admins",
+      "user": "Users"
+    },
+    "toast": {
+      "loadFailed": "Failed to load users",
+      "updated": "User updated",
+      "created": "User created",
+      "cannotDeleteSelf": "You cannot delete your own account",
+      "deleted": "User deleted",
+      "cannotDeactivateSelf": "You cannot deactivate your own account",
+      "deactivated": "User deactivated",
+      "activated": "User activated",
+      "updateFailed": "Failed to update user"
+    },
+    "validation": {
+      "nameEmailRequired": "First name, last name, and email are required",
+      "passwordRequired": "Password is required for new users",
+      "groupRequired": "Admin and User accounts must be assigned to at least one data holder group"
+    },
+    "form": {
+      "firstName": "First Name *",
+      "lastName": "Last Name *",
+      "email": "Email *",
+      "emailLocked": "Only the account owner or a master account can change an email address.",
+      "newPassword": "New Password",
+      "password": "Password *",
+      "passwordPlaceholder": "Leave blank to keep current",
+      "passwordHint": "Leave blank to keep the current password.",
+      "typeHint": "You can only create accounts below your own access level.",
+      "groups": "Data Holder Groups *",
+      "selectedCount": "({{count}} selected)",
+      "noGroupPermission": "You do not have permission to modify group assignments for this user.",
+      "adminNoGroups": "You have no group assignments, so you cannot assign groups to other users. Contact a Master account.",
+      "noGroupsExist": "No data holder groups exist yet. Create one first.",
+      "adminGroupHint": "You can only assign groups that you are a member of.",
+      "masterGroupHint": "Select which data holder groups this user can access.",
+      "outsideGroups": "This user also belongs to {{count}} group(s) outside your access. Those memberships will not be affected.",
+      "masterInfo": "Master accounts automatically have access to all data holder groups."
+    }
+  },
+  "dataHolders": {
+    "title": "Data Holders",
+    "count": "{{count}} registered",
+    "allGroups": "All Groups",
+    "register": "Register Data Holder",
+    "registerButton": "Register",
+    "searchPlaceholder": "Search name, ID, URL, contact...",
+    "id": "ID",
+    "groups": "Groups",
+    "url": "URL",
+    "contact": "Contact",
+    "empty": "No data holders registered",
+    "emptyInGroup": "in the selected group",
+    "viewCredentials": "View Credentials",
+    "itemLabel": "data holders",
+    "editTitle": "Edit Data Holder",
+    "deleteTitle": "Delete Data Holder",
+    "deleteWarning": "This will deactivate all credentials for this data holder. Any active connections will stop working immediately.",
+    "clientId": "Client ID",
+    "clientSecret": "Client Secret",
+    "secret": "Secret",
+    "hide": "Hide",
+    "reveal": "Reveal",
+    "validation": {
+      "nameIdRequired": "Name and ID are required",
+      "groupRequired": "Please select at least one data holder group"
+    },
+    "regenerate": {
+      "message": "This will invalidate the current credentials for \"{{name}}\".\nThe data holder will need to update their settings.",
+      "title": "Regenerate Credentials?",
+      "action": "Regenerate"
+    },
+    "credentials": {
+      "generated": "Credentials Generated",
+      "copyNow": "Copy these credentials now — the data holder will need them to connect.",
+      "title": "Credentials — {{name}}",
+      "info": "The data holder uses these credentials to connect to this Group Admin via Settings in their application.",
+      "secretHidden": "For security, the client secret is only shown once when generated. Use \"Regenerate credentials\" to issue a new secret."
+    },
+    "form": {
+      "id": "Data Holder ID *",
+      "name": "Name *",
+      "groups": "Data Holder Groups",
+      "groupsHelp": "Select one or more groups this data holder belongs to.",
+      "contactEmail": "Contact Email",
+      "callbackUrl": "Callback URL"
+    },
+    "toast": {
+      "loadFailed": "Failed to load data holders",
+      "updated": "Updated",
+      "registered": "Data holder registered",
+      "disabled": "{{name}} disabled",
+      "enabled": "{{name}} enabled",
+      "statusFailed": "Failed to update status",
+      "deleted": "Data holder deleted",
+      "noCredentials": "No credentials found",
+      "revealFailed": "Failed to reveal credentials",
+      "regenerated": "Credentials regenerated",
+      "regenerateFailed": "Regeneration failed",
+      "copied": "{{label}} copied",
+      "copyFailed": "Copy failed"
+    }
+  },
+  "requestorGroups": {
+    "title": "Requestor Groups",
+    "registeredCount": "{{count}} registered",
+    "searchPlaceholder": "Search name, code, contact...",
+    "empty": "No requestor groups",
+    "clickToToggle": "Click to toggle",
+    "viewDetails": "View Details",
+    "accept": "Accept",
+    "deny": "Deny",
+    "credentialsTooltip": "Credentials",
+    "itemLabel": "requestor groups",
+    "regenerate": "Regenerate",
+    "acceptTitle": "Accept — {{name}}",
+    "denyTitle": "Deny — {{name}}",
+    "deleteTitle": "Delete Requestor Group",
+    "deleteWarning": "This will deactivate all credentials. Active connections will stop working.",
+    "status": {
+      "PENDING": "Pending",
+      "ACCEPTED": "Accepted",
+      "DENIED": "Denied",
+      "SUSPENDED": "Suspended"
+    },
+    "table": {
+      "code": "Code",
+      "dhGroup": "DH Group",
+      "contact": "Contact"
+    },
+    "detail": {
+      "code": "Code",
+      "organization": "Organization",
+      "contact": "Contact",
+      "reasonForAccess": "Reason for Access",
+      "registered": "Registered",
+      "dataHolderGroup": "Data Holder Group",
+      "noGroupAssigned": "No group assigned",
+      "reviewedBy": "Reviewed by {{name}} at {{date}}"
+    },
+    "action": {
+      "acceptBody": "Accepting will generate API credentials for this requestor group.",
+      "denyBody": "This will deny the registration request.",
+      "notes": "Notes",
+      "denyPlaceholder": "Reason for denial...",
+      "optionalPlaceholder": "Optional notes...",
+      "acceptSubmit": "Accept & Generate Credentials"
+    },
+    "regenerateConfirm": {
+      "body": "This will invalidate the current credentials for \"{{name}}\".",
+      "title": "Regenerate Credentials?"
+    },
+    "credentials": {
+      "title": "Credentials — {{name}}",
+      "clientId": "Client ID",
+      "clientSecret": "Client Secret",
+      "info": "The requestor group uses these credentials to interact with this Group Admin's API.",
+      "secretNotRetrievable": "For security, the client secret is only shown once when generated. Use “Regenerate credentials” to issue a new secret."
+    },
+    "toast": {
+      "loadFailed": "Failed to load requestor groups",
+      "accepted": "Requestor group accepted",
+      "denied": "Requestor group denied",
+      "actionFailed": "Action failed",
+      "disabled": "{{name}} disabled",
+      "enabled": "{{name}} enabled",
+      "statusUpdateFailed": "Failed to update status",
+      "deleted": "Requestor group deleted",
+      "deleteFailed": "Delete failed",
+      "noCredentials": "No credentials found",
+      "revealFailed": "Failed to reveal credentials",
+      "regenerated": "Credentials regenerated",
+      "regenerateFailed": "Regeneration failed",
+      "copied": "{{label}} copied",
+      "copyFailed": "Copy failed",
+      "groupUpdated": "Group updated",
+      "groupUpdateFailed": "Failed to update group"
+    }
+  },
+  "dataHolderGroups": {
+    "title": "Data Holder Groups",
+    "groupCount": "{{count}} groups",
+    "createGroup": "Create Group",
+    "editGroup": "Edit Group",
+    "deleteGroup": "Delete Group",
+    "searchPlaceholder": "Search name or description...",
+    "empty": "No data holder groups yet",
+    "clickToToggle": "Click to toggle",
+    "manageMembers": "Manage Members",
+    "itemLabel": "groups",
+    "table": {
+      "id": "ID",
+      "visibility": "Visibility",
+      "created": "Created"
+    },
+    "visibility": {
+      "private": "Private",
+      "public": "Public",
+      "global": "Globally published",
+      "privateHelp": "Hidden from the joining list, and none of its templates are listed anywhere. Applicants must enter the exact group name to apply.",
+      "publicHelp": "Shown in the joining list. Its templates are listed here, but never sent to the common repository.",
+      "globalHelp": "Shown in the joining list, and its templates marked Globally published are sent to the common repository."
+    },
+    "form": {
+      "nameLabel": "Name *",
+      "visibilityLabel": "Visibility",
+      "visibilityCeiling": "This is the ceiling for the group's templates: a template can never be advertised more widely than its group.",
+      "contactHeading": "Administrator contact",
+      "contactHelp": "How requestors reach this group about its agreements. Every agreement shows this contact unless it carries its own.",
+      "contactFirstName": "First name",
+      "contactLastName": "Last name",
+      "contactEmail": "Contact email",
+      "contactPhone": "Contact phone",
+      "contactPhoneOptional": "Optional.",
+      "address": "Street address",
+      "city": "City",
+      "stateProvince": "State / Province",
+      "postalCode": "Postal code",
+      "country": "Country"
+    },
+    "deleteConfirm": {
+      "question": "Are you sure you want to delete",
+      "warning": "This group must have no data holders assigned to it before it can be deleted. All member associations will be removed."
+    },
+    "validation": {
+      "nameRequired": "Name is required",
+      "contactEmailInvalid": "Enter a valid contact email address"
+    },
+    "toast": {
+      "loadFailed": "Failed to load data holder groups",
+      "updated": "Group updated",
+      "created": "Group created",
+      "saveFailed": "Save failed",
+      "disabled": "{{name}} disabled",
+      "enabled": "{{name}} enabled",
+      "statusUpdateFailed": "Failed to update status",
+      "deleted": "Group deleted",
+      "deleteFailed": "Delete failed"
+    },
+    "members": {
+      "title": "Members — {{name}}",
+      "masterInfo": "Master accounts automatically have access to all groups and do not need explicit membership.",
+      "selectUser": "Select a user to add...",
+      "empty": "No explicit members yet",
+      "removeFromGroup": "Remove from group",
+      "table": {
+        "role": "Role",
+        "joined": "Joined"
+      },
+      "removeConfirm": {
+        "body": "This user will lose access to the group.",
+        "title": "Remove Member?"
+      },
+      "toast": {
+        "loadFailed": "Failed to load members",
+        "added": "Member added",
+        "addFailed": "Failed to add member",
+        "removed": "Member removed",
+        "removeFailed": "Failed to remove member"
+      }
+    }
+  },
+  "templateFormModal": {
+    "dataTypes": {
+      "string": "String",
+      "integer": "Integer",
+      "float": "Float",
+      "boolean": "Boolean",
+      "date": "Date",
+      "datetime": "DateTime",
+      "file": "File",
+      "email": "Email",
+      "url": "URL",
+      "enum": "Enum (Select)",
+      "text": "Text (Multiline)",
+      "json": "JSON"
+    },
+    "customParams": {
+      "title": "Custom Parameters",
+      "requestTypeFallback": "Request Type",
+      "emptyBar": "No custom parameters defined. Add one to get started.",
+      "summaryParams": "{{count}} parameter",
+      "summaryParamsPlural": "{{count}} parameters",
+      "summaryRequired": "{{count}} required",
+      "addParameter": "Add Parameter",
+      "dragToReorder": "Drag to reorder",
+      "unnamed": "(unnamed)",
+      "parameterName": "Parameter Name *",
+      "parameterNamePlaceholder": "e.g. case_number",
+      "parameterNameHint": "Letters, numbers, underscores only",
+      "dataType": "Data Type *",
+      "descriptionPlaceholder": "Describe this parameter...",
+      "placeholderLabel": "Placeholder",
+      "placeholderPlaceholder": "Hint text for the input",
+      "defaultValue": "Default Value",
+      "noDefault": "No default",
+      "enumValues": "Enum Values *",
+      "enumValuesHint": "Comma-separated list of allowed values",
+      "maxLength": "Max Length",
+      "noLimit": "No limit",
+      "validationRegex": "Validation Regex",
+      "minValue": "Min Value",
+      "maxValue": "Max Value",
+      "allowedFileTypes": "Allowed File Types",
+      "allowedFileTypesHint": "Comma-separated extensions",
+      "maxSizeMb": "Max Size (MB)",
+      "formatCriteria": "Format Requirements",
+      "formatCriteriaHint": "Checked automatically when the data holder receives the file. Leave a field blank to skip that check.",
+      "minPages": "Min Pages",
+      "maxPages": "Max Pages",
+      "minWordCount": "Min Word Count",
+      "requiredTextPatterns": "Required Text",
+      "forbiddenTextPatterns": "Disallowed Text",
+      "patternsHint": "One regular expression per line; all must match.",
+      "minWidth": "Min Width (px)",
+      "minHeight": "Min Height (px)",
+      "minDpi": "Min DPI",
+      "minEmbeddedImageWidth": "Min Embedded Image Width (px)",
+      "minEmbeddedImageHeight": "Min Embedded Image Height (px)",
+      "requireTextLayer": "Must have selectable text (not a scan)",
+      "requireEmbeddedImage": "Must contain an image/photo",
+      "allowScanned": "Allow scanned documents (OCR)",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "duplicate": "Duplicate",
+      "emptyTitle": "No custom parameters defined for this request type.",
+      "emptyBody": "Custom parameters let requestors provide additional data when making requests, such as case numbers, reference documents, or other context.",
+      "addFirstParameter": "Add First Parameter",
+      "reorderHint": "Drag rows or use arrows to reorder",
+      "saveParameters": "Save Parameters"
+    },
+    "rdap": {
+      "title": "RDAP Parameters",
+      "done": "Done",
+      "allOn": "All On",
+      "allOff": "All Off",
+      "groups": {
+        "": "",
+        "Domain": "Domain",
+        "Nameservers": "Nameservers",
+        "Events": "Events",
+        "Registrant": "Registrant",
+        "Admin": "Admin",
+        "Tech": "Tech",
+        "Billing": "Billing",
+        "Registrar": "Registrar",
+        "DNSSEC": "DNSSEC",
+        "Network": "Network",
+        "ASN": "ASN",
+        "Other": "Other"
+      }
+    },
+    "requestType": {
+      "name": "Name *",
+      "typeCodeLabel": "Type Code",
+      "typeCodeAuto": "auto-assigned on save",
+      "typeCodeReadonlyHint": "Automatically assigned by the system and globally unique — not editable.",
+      "duplicateName": "Duplicate name",
+      "accessLevel": "Access Level",
+      "accessLevel0": "L0 - Public",
+      "accessLevel1": "L1 - Basic",
+      "accessLevel2": "L2 - Enhanced",
+      "accessLevel3": "L3 - Full",
+      "conf": "Conf",
+      "exig": "Exig",
+      "manualApproval": "Manual Appr.",
+      "rdapParams": "RDAP Params",
+      "customParameters": "Custom Parameters",
+      "queryValueRegex": "Query Value Regex",
+      "activeBadge": "active",
+      "queryValueRegexPlaceholder": "e.g. .*dbx.* (leave blank to allow all)",
+      "rejectionMessage": "Rejection Message",
+      "rejectionMessagePlaceholder": "e.g. Query must contain 'dbx' for this request type",
+      "kind": "Kind",
+      "kindRdap": "RDAP",
+      "kindRdrs": "ICANN RDRS",
+      "kindRdrsHint": "Submits a registration data request to ICANN's RDRS using the requestor's own ICANN credentials. It never reaches a data holder, so access level, RDAP parameters and the query regex do not apply.",
+      "rdrsDefaults": "RDRS Defaults",
+      "rdrsCategory": "Preset Category",
+      "rdrsPriority": "Preset Priority",
+      "rdrsOrganization": "Preset Organization",
+      "rdrsOrganizationPlaceholder": "Leave blank for the requestor to fill in",
+      "rdrsNoPreset": "No preset — requestor chooses",
+      "rdrsAllowedElements": "Selectable Data Elements",
+      "rdrsAllElements": "(none checked — all are selectable)",
+      "rdrsSomeElements": "({{count}} selected)"
+    },
+    "main": {
+      "duplicateNamesMessage": "Duplicate request type name(s) found: {{names}}.\nEach request type must have a unique name.",
+      "duplicateNamesTitle": "Duplicate Request Type Names",
+      "tabBasic": "Basic Info",
+      "tabRequestTypes": "Request Types ({{count}})",
+      "tabLimits": "Rate Limits",
+      "tabTerms": "Terms & Policy",
+      "editTemplate": "Edit Template",
+      "createTemplate": "Create Template",
+      "updateTemplate": "Update Template",
+      "templateName": "Template Name *",
+      "templateNamePlaceholder": "e.g., Law Enforcement Access",
+      "dataHolderGroup": "Data Holder Group *",
+      "selectGroup": "Select a group...",
+      "dataHolderGroupFixed": "Set by the group you are working in. An agreement cannot be moved to another group once created.",
+      "dataHolderGroupLocked": "Fixed once the template is saved. Only a master account can change it.",
+      "shortDescription": "Short Description",
+      "requiredGroupTypes": "Required Group Types",
+      "requiredGroupTypesPlaceholder": "law-enforcement, government",
+      "disclosureMode": "Disclosure Mode",
+      "disclosureOpen": "Open",
+      "disclosureHashed": "Hashed",
+      "disclosureOmit": "Omit",
+      "disclosureHint": "How field data is disclosed: shown as-is, hashed, or excluded.",
+      "presetStandard": "Standard",
+      "presetConfidential": "Confidential",
+      "presetExigent": "Exigent",
+      "presetRdrs": "ICANN RDRS",
+      "noRequestTypes": "No request types. Add at least one.",
+      "maxQueriesPerDay": "Max Queries Per Day",
+      "maxQueriesPerMonth": "Max Queries Per Month",
+      "unlimited": "Unlimited",
+      "contactHeading": "Contact information",
+      "contactHint": "Shown to requestors with this agreement, and to whoever needs to raise a question about it. Kept current: changing it never asks subscribers to accept anything again.",
+      "useGroupContact": "Use the data holder group's contact information",
+      "contactFromGroup": "From the data holder group. Edit it on the Data Holder Groups page to change it everywhere.",
+      "contactGroupEmpty": "This data holder group has no contact information yet. Set it on the Data Holder Groups page, or turn the switch off to give this agreement its own.",
+      "contactFirstName": "First name",
+      "contactLastName": "Last name",
+      "contactEmail": "Contact email *",
+      "contactEmailRequired": "A contact email is required when this agreement uses its own contact information.",
+      "contactPhone": "Contact phone",
+      "contactPhoneOptional": "Optional.",
+      "contactAddress": "Street address",
+      "contactCity": "City",
+      "contactStateProvince": "State / Province",
+      "contactPostalCode": "Postal code",
+      "contactCountry": "Country",
+      "legalSections": "Data Holder Group Fields",
+      "legalSectionsHint": "Legal terms set by your group. Sections and clauses are numbered automatically, and each section is shown to the requestor with its own acceptance checkbox. A cross-reference is shown by section name while you edit and becomes the section number in the agreement itself, so it stays correct when sections move.",
+      "addLegalSection": "Add section",
+      "noLegalSections": "No data holder group fields yet.",
+      "legalSectionTitlePlaceholder": "Section title, e.g. Data Usage Restrictions",
+      "subscriptionFields": "Requestor Group Fields",
+      "subscriptionFieldsHint": "Values the requestor group must supply when subscribing to this agreement.",
+      "addSubscriptionField": "Add field",
+      "noSubscriptionFields": "No requestor group fields yet.",
+      "fieldName": "Name *",
+      "fieldType": "Type",
+      "fieldRequired": "Required",
+      "fieldOptions": "Options",
+      "fieldOptionsPlaceholder": "Comma-separated, e.g. Yes,No,Not applicable",
+      "fieldDescription": "Help text",
+      "visibility": "Visibility",
+      "active": "Active",
+      "activeHint": "Active agreements accept new subscriptions. Turning this off never affects subscriptions already in place.",
+      "fieldAcknowledgementRequired": "Acknowledgement required",
+      "fieldTypes": {
+        "string": "Text",
+        "text": "Paragraph",
+        "url": "URL (link to review)",
+        "number": "Number",
+        "date": "Date",
+        "select": "Select",
+        "checkbox": "Checkbox"
+      },
+      "fieldUrl": "Link URL",
+      "fieldUrlPlaceholder": "https://example.org/acceptable-use-policy.pdf",
+      "fieldUrlHint": "The requestor sees this as a link to open and review. Tick \"Acknowledgement required\" to make them confirm they have read it before subscribing.",
+      "fieldMaxLength": "Character limit",
+      "fieldMaxLengthPlaceholder": "No limit",
+      "insertStandardSection": "Insert standard section…",
+      "addLegalClause": "Add clause",
+      "legalClausePlaceholder": "The text of this clause…",
+      "legalClauseLabel": "Clause {{number}}",
+      "insertReference": "Insert reference…",
+      "referencePreview": "Reads as:",
+      "referenceUntitled": "Untitled section",
+      "referenceUnknown": "Reference no longer exists",
+      "referenceTooltip": "Appears in the agreement as the number",
+      "referenceUnknownTooltip": "The section or clause this points at was removed:"
+    }
+  },
+  "footer": {
+    "codeBy": "Code By:",
+    "copyright": "© {{year}} Edgemoor Research Institute and Derek Jenkins. Licensed under AGPL-3.0.",
+    "sourceCode": "Source code"
+  },
+  "commonRepository": {
+    "intro": {
+      "title": "Publish this registry to a common repository",
+      "body": "A common repository is the central node a Jadmin pings when it goes looking for data holder groups. What you name below is this deployment as a whole — your data holder group registry. Because a deployment is multi-tenant, the announcement carries its data holder groups as a list, each with the templates that group permits over there: groups set to Globally published, and within them templates set to Globally published. Nothing else leaves this host, and the repository’s own administrators review the listing before it is published."
+    },
+    "settings": {
+      "title": "Publication",
+      "enabled": "Announce this registry to a common repository",
+      "enabledHint": "While this is off, nothing is sent and this deployment stays invisible to anyone who has not registered it by hand.",
+      "url": "Common repository URL",
+      "urlHint": "The repository application’s base URL — the part before /registry, not the feed itself. The backend calls this, not your browser, so it must resolve from the server: use a hostname the backend can see and the API’s port, not the admin UI’s. In the default compose stack that is http://dataholder-registry-backend:8084/dataholder-registry.",
+      "identityHeading": "How this registry is identified over there",
+      "code": "Registry code",
+      "codeHint": "Claimed on the first announcement and fixed afterwards. Requestor managers key on it.",
+      "name": "Registry name",
+      "nameHint": "The name of this deployment, not of any one data holder group — those go out as a list beneath it.",
+      "baseUrl": "Public API base URL",
+      "baseUrlHint": "Where a requestor manager should send its requests — this deployment, as the outside world reaches it.",
+      "contact": "Contact email",
+      "announceNow": "Announce now",
+      "enableFirst": "Turn publication on and save before announcing."
+    },
+    "status": {
+      "not_registered": "Not registered",
+      "pending": "Awaiting review",
+      "approved": "Listed",
+      "rejected": "Rejected",
+      "suspended": "Suspended"
+    },
+    "lastAnnounce": {
+      "ok": "Last announcement succeeded",
+      "failed": "Last announcement failed"
+    },
+    "preview": {
+      "title": "What would be published ({{groups}} groups · {{templates}} templates)",
+      "body": "Data holder groups set to Globally published, each with the templates whose effective visibility is also Globally published. A template set to Globally published under a group that is not itself globally published has nowhere to be listed and does not appear.",
+      "empty": "No data holder group is globally published yet. Set a group to Globally published, then set the templates within it that should go with it.",
+      "groupEmpty": "No globally published templates in this group — it would be listed on its own.",
+      "templateCount": "{{count}} templates",
+      "noRequestTypes": "No active request types.",
+      "manualApproval": "Manual approval",
+      "parameters": "{{count}} params ({{required}} required)",
+      "limits": "Limits: {{day}}/day · {{month}}/month"
+    },
+    "toasts": {
+      "saved": "Publication settings saved",
+      "announced": "Announced to the common repository"
+    },
+    "errors": {
+      "loadFailed": "Could not load the publication settings",
+      "saveFailed": "Could not save the publication settings",
+      "announceFailed": "Could not reach the common repository"
+    }
+  },
+  "countrySelect": {
+    "placeholder": "Select a country or territory",
+    "searchPlaceholder": "Search countries…",
+    "noMatches": "No country matches that search.",
+    "clear": "Clear the selected country"
+  },
+  "session": {
+    "timeout": {
+      "title": "Still there?",
+      "body": "You have been inactive for a while. For your security this session will end, and any unsaved work will be lost.",
+      "stay": "Stay signed in",
+      "signOut": "Sign out"
+    }
+  }
+}

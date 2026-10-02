@@ -1,0 +1,12 @@
+FROM node:20-alpine
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+
+EXPOSE 3000
+# Install into the mounted volume at startup so the RR7 dev binaries exist even
+# when the anonymous node_modules volume shadows the image's install.
+CMD ["sh", "-c", "npm install && npm run dev -- --host"]
