@@ -20,6 +20,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -242,6 +243,103 @@ public class TokenIntrospectionService {
     public TokenInfo introspectToken(String token) {
         SubscriptionIntrospection introspection = introspectForSubscription(token, null);
         return introspection.isActive() ? introspection.tokenInfo() : null;
+    }
+
+    // ==================== Requestor group joining links ====================
+
+    /** Introspection-response claim in which a requestor group reports its public joining link. */
+    public static final String JOINING_URL_CLAIM = "joining_url";
+
+    /** A requestor group's public joining link, as its introspection client reported it. */
+    public record JoiningLink(String requestorGroupName, String requestorGroupCode, String url) {}
+
+    /**
+     * The joining links of the requestor groups with an active subscription this data holder
+     * serves — tied to it directly or to a data holder group it belongs to.
+     *
+     * <p>A public query carries no requestor token, so each link is read by introspecting a token
+     * the subscription's own introspection client obtains with its client credentials: the
+     * requestor manager configures that client to report the group's link, when it has one, in
+     * its introspection responses. Groups without a link, and subscriptions whose introspection
+     * credentials are missing, are skipped.
+     */
+    public List<JoiningLink> requestorGroupJoiningLinks() {
+        if (!groupAdminClient.isConfigured()) return List.of();
+
+        // Which subscriptions this data holder serves; that listing carries no credentials.
+        Set<String> served = new LinkedHashSet<>();
+        Set<String> groupCodes = new LinkedHashSet<>();
+        for (Map<String, Object> sub : groupAdminClient.getSubscriptions()) {
+            if (!"ACTIVE".equals(sub.get("status"))) continue;
+            String requestId = str(sub.get("requestId"));
+            String code = str(sub.get("requestorGroupCode"));
+            if (requestId == null || code == null) continue;
+            served.add(requestId);
+            groupCodes.add(code);
+        }
+
+        // The introspection credentials, for exactly those subscriptions.
+        Map<String, Endpoint> endpoints = new LinkedHashMap<>();
+        for (String code : groupCodes) {
+            for (Map<String, Object> sub : groupAdminClient.getSubscriptionsByGroupCode(code)) {
+                if (!served.contains(str(sub.get("requestId")))) continue;
+                Credential credential = new Credential(str(sub.get("introspectionClientId")),
+                        str(sub.get("introspectionClientSecret")));
+                String url = str(sub.get("introspectionUrl"));
+                if (Endpoint.notBlank(url) && credential.isComplete()) {
+                    addEndpoint(endpoints, new Endpoint(url, credential.clientId(), credential.clientSecret(),
+                            str(sub.get("requestorGroupCode")), str(sub.get("requestorGroupName"))));
+                }
+            }
+        }
+
+        List<JoiningLink> links = new ArrayList<>();
+        for (Endpoint endpoint : endpoints.values()) {
+            String url = joiningUrlVia(endpoint);
+            if (url != null) links.add(new JoiningLink(endpoint.groupName(), endpoint.groupCode(), url));
+        }
+        return links;
+    }
+
+    /** The joining link the endpoint's client reports for its own token, or null when it reports none. */
+    private String joiningUrlVia(Endpoint endpoint) {
+        String tokenUrl = tokenEndpointFor(endpoint.url());
+        if (tokenUrl == null) {
+            log.debug("Joining link: cannot derive a token endpoint from introspection URL {}", endpoint.url());
+            return null;
+        }
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+            headers.setBasicAuth(endpoint.clientId(), endpoint.clientSecret());
+            MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+            body.add("grant_type", "client_credentials");
+
+            ResponseEntity<String> response = restTemplate.exchange(
+                    tokenUrl, HttpMethod.POST, new HttpEntity<>(body, headers), String.class);
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) return null;
+            Map<String, Object> tokenResponse = objectMapper.readValue(response.getBody(), new TypeReference<>() {});
+            String token = str(tokenResponse.get("access_token"));
+            if (token == null) return null;
+
+            IntrospectionResult result = introspectViaUrl(token, endpoint, endpoint.groupCode());
+            Object claim = result.active() ? result.claims().get(JOINING_URL_CLAIM) : null;
+            return claim instanceof String url && !url.isBlank() ? url : null;
+        } catch (Exception e) {
+            log.warn("Joining link: could not read it for requestor group {}: {}", endpoint.groupCode(), e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * The OAuth token endpoint beside an introspection endpoint. Keycloak, which the requestor
+     * manager provisions these clients in, serves introspection at {@code <token endpoint>/introspect}.
+     */
+    static String tokenEndpointFor(String introspectionUrl) {
+        if (introspectionUrl == null) return null;
+        String url = introspectionUrl.endsWith("/") ? introspectionUrl.substring(0, introspectionUrl.length() - 1)
+                : introspectionUrl;
+        return url.endsWith("/introspect") ? url.substring(0, url.length() - "/introspect".length()) : null;
     }
 
     // ==================== Subscription resolution ====================

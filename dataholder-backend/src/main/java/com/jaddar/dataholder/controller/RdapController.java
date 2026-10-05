@@ -28,6 +28,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -48,6 +49,7 @@ public class RdapController {
     private final com.jaddar.dataholder.service.ExternalDatabaseService externalDatabaseService;
     private final com.jaddar.dataholder.repository.RdapDataMappingRepository mappingRepository;
     private final com.jaddar.dataholder.service.FileSecurityService fileSecurityService;
+    private final com.jaddar.dataholder.service.PublicInformationServicesService publicInformationServices;
 
     private static final MediaType RDAP_JSON = MediaType.parseMediaType("application/rdap+json");
     private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ISO_DATE_TIME;
@@ -758,7 +760,24 @@ public class RdapController {
                     result.getAgreementNames());
         }
 
+        /*
+         * Added after redaction and filtering: it describes this data holder rather than the
+         * object, so neither has anything to remove from it.
+         */
+        if (result.isPublicQuery()) {
+            String contextUri = ServletUriComponentsBuilder.fromCurrentRequest().build().toUriString();
+            publicInformationServices.noticeForPublicAnswer(contextUri)
+                    .ifPresent(notice -> appendNotice(redactedResponse, notice));
+        }
+
         return ResponseEntity.ok().contentType(RDAP_JSON).body(redactedResponse);
+    }
+
+    private static void appendNotice(Map<String, Object> response, Map<String, Object> notice) {
+        List<Object> notices = new ArrayList<>();
+        if (response.get("notices") instanceof List<?> existing) notices.addAll(existing);
+        notices.add(notice);
+        response.put("notices", notices);
     }
 
     // ==================== RDAP PARAMETER FILTERING ====================

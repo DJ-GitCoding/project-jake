@@ -130,7 +130,7 @@ public class RequestorGroupController {
     }
     
     @PutMapping("/{id}")
-    @Operation(summary = "Update requestor group", description = "Update an existing requestor group (Master and Admin only)")
+    @Operation(summary = "Update requestor group", description = "Update an existing requestor group (Master and Admin only; a requestor group admin may change their own group's joining link)")
     @ApiResponses(value = {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "200",

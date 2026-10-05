@@ -40,6 +40,7 @@ public class SubscriptionCredentialService {
     private final DataHolderGroupClientService dataHolderGroupClientService;
     private final SubscriptionCredentialRepository credentialRepository;
     private final SubscriptionRequestRepository subscriptionRequestRepository;
+    private final RequestorGroupJoinLinkService joinLinkService;
 
     /** Provisions a Keycloak client and delivers credentials to the data holder (main activation entry point). */
     @Transactional
@@ -60,7 +61,8 @@ public class SubscriptionCredentialService {
         ProvisionedClient provisioned = keycloakService.provisionClient(
                 subscriptionRequest.getInternalRequestId(),
                 subscriptionRequest.getDataHolderGroup().getCode(),
-                subscriptionRequest.getRequestorGroup().getName()
+                subscriptionRequest.getRequestorGroup().getName(),
+                joinLinkService.publicJoinUrl(subscriptionRequest.getRequestorGroup())
         );
 
         // Step 2: Store the credential record

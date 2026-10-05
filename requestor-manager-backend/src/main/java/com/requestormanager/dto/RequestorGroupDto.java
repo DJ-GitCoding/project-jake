@@ -70,6 +70,11 @@ public class RequestorGroupDto {
         @Size(max = 100)
         @Schema(description = "Default country", required = true)
         private String defaultCountry;
+
+        @Size(max = 500)
+        @Schema(description = "Public link where someone can apply to join this group. Optional; data holders "
+                + "that offer requestor group links list it with their public RDAP answers.")
+        private String joiningUrl;
     }
     
     @Getter
@@ -116,6 +121,10 @@ public class RequestorGroupDto {
         @Size(max = 100)
         @Schema(description = "Default country")
         private String defaultCountry;
+
+        @Size(max = 500)
+        @Schema(description = "Public joining link; send an empty string to remove it")
+        private String joiningUrl;
     }
     
     @Getter
@@ -155,6 +164,13 @@ public class RequestorGroupDto {
 
         @Schema(description = "Default country")
         private String defaultCountry;
+
+        @Schema(description = "Public link where someone can apply to join this group")
+        private String joiningUrl;
+
+        @Schema(description = "The public requestor manager endpoint data holders hand out for joining this group; "
+                + "null while no joining link is set")
+        private String publicJoinUrl;
 
         @Schema(description = "Number of active agreements for this group")
         private Integer agreementCount;

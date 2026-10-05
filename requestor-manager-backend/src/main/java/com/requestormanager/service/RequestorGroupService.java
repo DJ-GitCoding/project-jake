@@ -22,8 +22,14 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,6 +40,7 @@ public class RequestorGroupService {
     private final RequestorGroupRepository requestorGroupRepository;
     private final SecurityUtils securityUtils;
     private final KeycloakUserService keycloakUserService;
+    private final RequestorGroupJoinLinkService joinLinkService;
 
     /**
      * This deployment's Keycloak token-introspection endpoint. Used to auto-fill a new group's
@@ -85,6 +92,8 @@ public class RequestorGroupService {
         requireAddressField(request.getDefaultStateProvince(), "A state or province is required.");
         requireAddressField(request.getDefaultPostalCode(), "A postal code is required.");
         requireAddressField(request.getDefaultCountry(), "A country is required.");
+
+        String joiningUrl = normalizeJoiningUrl(request.getJoiningUrl());
         
         keycloakUserService.createKeycloakGroup(request.getName());
         
@@ -98,6 +107,7 @@ public class RequestorGroupService {
                 .defaultStateProvince(trimToNull(request.getDefaultStateProvince()))
                 .defaultPostalCode(trimToNull(request.getDefaultPostalCode()))
                 .defaultCountry(trimToNull(request.getDefaultCountry()))
+                .joiningUrl(joiningUrl)
                 .createdByKeycloakId(currentUser.getSub())
                 .createdByEmail(currentUser.getEmail())
                 .createdByName(currentUser.getDisplayName())
@@ -173,12 +183,22 @@ public class RequestorGroupService {
             Long id, RequestorGroupDto.UpdateRequest request) {
         KeycloakUser currentUser = securityUtils.requireCurrentUser();
         
-        if (currentUser.getUserType() != UserType.JADDAR_MASTER_ADMIN && currentUser.getUserType() != UserType.GROUP_ADMIN) {
-            throw new AccessDeniedException("Only Master and Admin users can update requestor groups");
-        }
-        
         RequestorGroup group = requestorGroupRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("RequestorGroup", "id", id));
+
+        if (currentUser.getUserType() != UserType.JADDAR_MASTER_ADMIN && currentUser.getUserType() != UserType.GROUP_ADMIN) {
+            /*
+             * A requestor group's own admin decides where people apply to join it, but every
+             * other field is managed above them: data holders identify and authorise the group
+             * by its name, code and introspection URL.
+             */
+            if (currentUser.getUserType() != UserType.REQUESTOR_GROUP_ADMIN || !userBelongsToGroup(currentUser, group)) {
+                throw new AccessDeniedException("Only Master and Admin users can update requestor groups");
+            }
+            if (changesMoreThanJoiningUrl(group, request)) {
+                throw new AccessDeniedException("A requestor group admin can only change the group's joining link");
+            }
+        }
         
         if (request.getName() != null && !request.getName().equals(group.getName())) {
             if (requestorGroupRepository.existsByName(request.getName())) {
@@ -236,10 +256,21 @@ public class RequestorGroupService {
             requireAddressField(request.getDefaultCountry(), "A country is required.");
             group.setDefaultCountry(request.getDefaultCountry().trim());
         }
+
+        boolean joiningUrlChanged = false;
+        if (request.getJoiningUrl() != null) {
+            String joiningUrl = normalizeJoiningUrl(request.getJoiningUrl());
+            joiningUrlChanged = !Objects.equals(joiningUrl, group.getJoiningUrl());
+            group.setJoiningUrl(joiningUrl);
+        }
         
         RequestorGroup savedGroup = requestorGroupRepository.save(group);
         log.info("Requestor group updated: {} (code: {}) by {}",
                 savedGroup.getName(), savedGroup.getCode(), currentUser.getEmail());
+
+        if (joiningUrlChanged) {
+            publishJoiningLinkAfterCommit(savedGroup.getId());
+        }
         
         return mapToResponse(savedGroup);
     }
@@ -259,6 +290,76 @@ public class RequestorGroupService {
         
         requestorGroupRepository.delete(group);
         log.info("Requestor group deleted: {} by {} (also deleted from Keycloak)", group.getName(), currentUser.getEmail());
+    }
+
+    /**
+     * The joining link a group publishes, for the public redirect. Empty when the group does not
+     * exist or has not set one, so the caller cannot tell those two apart.
+     */
+    @Transactional(readOnly = true)
+    public Optional<String> findJoiningUrl(Long id) {
+        return requestorGroupRepository.findById(id)
+                .map(RequestorGroup::getJoiningUrl)
+                .filter(url -> !url.isBlank());
+    }
+
+    /**
+     * Update the group's introspection clients once the edit has committed, so a slow or
+     * unreachable Keycloak never holds the transaction open or rolls back the edit. Anything that
+     * fails here is retried by the joining-link sync job.
+     */
+    private void publishJoiningLinkAfterCommit(Long groupId) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    joinLinkService.syncGroup(groupId);
+                } catch (Exception e) {
+                    log.warn("Joining link for requestor group {} not yet delivered: {}", groupId, e.getMessage());
+                }
+            }
+        });
+    }
+
+    /** True when the update would change any field other than the joining link. */
+    private boolean changesMoreThanJoiningUrl(RequestorGroup group, RequestorGroupDto.UpdateRequest request) {
+        return differs(request.getName(), group.getName())
+                || (request.getCode() != null && !Objects.equals(normalizeCode(request.getCode()), group.getCode()))
+                || differs(request.getDescription(), group.getDescription())
+                || differs(request.getDefaultIntrospectionUrl(), group.getDefaultIntrospectionUrl())
+                || differs(request.getDefaultAddress(), group.getDefaultAddress())
+                || differs(request.getDefaultCity(), group.getDefaultCity())
+                || differs(request.getDefaultStateProvince(), group.getDefaultStateProvince())
+                || differs(request.getDefaultPostalCode(), group.getDefaultPostalCode())
+                || differs(request.getDefaultCountry(), group.getDefaultCountry());
+    }
+
+    /** A field the update leaves out (null) never counts as a change, and blank equals unset. */
+    private boolean differs(String requested, String current) {
+        return requested != null && !Objects.equals(trimToNull(requested), trimToNull(current));
+    }
+
+    /**
+     * An absolute http(s) URL, trimmed, or null to remove the link. Data holders show it to the
+     * public, so anything that a browser would not open as a web page is refused.
+     */
+    private String normalizeJoiningUrl(String value) {
+        String trimmed = trimToNull(value);
+        if (trimmed == null) return null;
+        if (trimmed.length() > 500) {
+            throw new BadRequestException("The joining link must not exceed 500 characters.");
+        }
+        try {
+            URI uri = new URI(trimmed);
+            String scheme = uri.getScheme();
+            if (scheme != null && uri.getHost() != null
+                    && (scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) {
+                return trimmed;
+            }
+        } catch (URISyntaxException ignored) {
+            // Falls through to the same message as any other unusable link.
+        }
+        throw new BadRequestException("The joining link must be a full web address starting with https:// or http://.");
     }
 
     /**
@@ -344,6 +445,8 @@ public class RequestorGroupService {
                 .defaultStateProvince(group.getDefaultStateProvince())
                 .defaultPostalCode(group.getDefaultPostalCode())
                 .defaultCountry(group.getDefaultCountry())
+                .joiningUrl(group.getJoiningUrl())
+                .publicJoinUrl(joinLinkService.publicJoinUrl(group))
                 .agreementCount(agreements.size())
                 .subscriptionRequestCount(subscriptionRequests.size())
                 .agreements(agreements)

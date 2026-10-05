@@ -39,6 +39,16 @@ public class DataHolderConfig {
     @Builder.Default
     private Boolean requireManualReviewAll = false;
 
+    /**
+     * When true, public (no-agreement) RDAP answers list the joining links of the requestor
+     * groups this data holder serves, so someone outside every requestor group can find one to
+     * join. Each link is read by token introspection, with the introspection credentials this
+     * data holder already holds for the group's subscription.
+     */
+    @Column(name = "offer_requestor_group_links", nullable = false)
+    @Builder.Default
+    private Boolean offerRequestorGroupLinks = false;
+
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;

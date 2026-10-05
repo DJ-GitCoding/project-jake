@@ -51,6 +51,7 @@ const RequestorGroups = () => {
     defaultStateProvince: '',
     defaultPostalCode: '',
     defaultCountry: '',
+    joiningUrl: '',
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -113,6 +114,7 @@ const RequestorGroups = () => {
         defaultStateProvince: group.defaultStateProvince || '',
         defaultPostalCode: group.defaultPostalCode || '',
         defaultCountry: group.defaultCountry || '',
+        joiningUrl: group.joiningUrl || '',
       });
     } else {
       setEditingGroup(null);
@@ -120,6 +122,7 @@ const RequestorGroups = () => {
       setFormData({
         name: '', code: '', description: '', defaultIntrospectionUrl: introspectionDefault,
         defaultAddress: '', defaultCity: '', defaultStateProvince: '', defaultPostalCode: '', defaultCountry: '',
+        joiningUrl: '',
       });
     }
     setShowModal(true);
@@ -131,6 +134,7 @@ const RequestorGroups = () => {
     setFormData({
       name: '', code: '', description: '', defaultIntrospectionUrl: '',
       defaultAddress: '', defaultCity: '', defaultStateProvince: '', defaultPostalCode: '', defaultCountry: '',
+      joiningUrl: '',
     });
   };
 
@@ -205,8 +209,46 @@ const RequestorGroups = () => {
     return null;
   };
 
+  /** Optional, but when given it must be a full web address: data holders show it to the public. */
+  const validateJoiningUrl = (url) => {
+    const trimmed = (url || '').trim();
+    if (!trimmed) return null;
+    try {
+      const parsed = new URL(trimmed);
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+        return t('requestorGroups.validation.joiningUrlFormat');
+      }
+    } catch {
+      return t('requestorGroups.validation.joiningUrlFormat');
+    }
+    return null;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const joiningUrlError = validateJoiningUrl(formData.joiningUrl);
+    if (joiningUrlError) {
+      showError(joiningUrlError);
+      return;
+    }
+
+    // A requestor group admin may only change where people apply to join their group.
+    if (joiningLinkOnly) {
+      setSubmitting(true);
+      try {
+        await requestorGroupsApi.update(editingGroup.id, { joiningUrl: formData.joiningUrl.trim() });
+        success(t('requestorGroups.success.updated'));
+        handleCloseModal();
+        loadGroups();
+      } catch (err) {
+        console.error('Failed to save joining link:', err);
+        showError(err.response?.data?.message || t('requestorGroups.errors.saveFailed'));
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
 
     if (!formData.name.trim()) {
       showError(t('requestorGroups.validation.nameRequired'));
@@ -250,6 +292,8 @@ const RequestorGroups = () => {
         defaultStateProvince: formData.defaultStateProvince.trim(),
         defaultPostalCode: formData.defaultPostalCode.trim(),
         defaultCountry: formData.defaultCountry.trim(),
+        // Sent even when blank so removing the joining link on update takes effect.
+        joiningUrl: formData.joiningUrl.trim(),
       };
 
       if (editingGroup) {
@@ -300,6 +344,8 @@ const RequestorGroups = () => {
   const canCreate = isGroupAdmin();
   const canEdit = (group) => canManageGroup(group.name);
   const canDelete = isGroupAdmin();
+  // Requestor group admins can open the editor for their own group, but only for the joining link.
+  const joiningLinkOnly = Boolean(editingGroup) && !isGroupAdmin();
 
   if (loading) {
     return <Loading message={t('requestorGroups.loading')} />;
@@ -504,6 +550,13 @@ const RequestorGroups = () => {
         }
       >
         <form onSubmit={handleSubmit}>
+          {joiningLinkOnly && (
+            <div className="alert alert-info small">
+              <i className="fas fa-info-circle me-2"></i>
+              {t('requestorGroups.form.joiningLinkOnlyNotice')}
+            </div>
+          )}
+          <fieldset disabled={joiningLinkOnly}>
           <div className="row">
             <div className="col-md-7 mb-3">
             <label htmlFor="name" className="form-label">
@@ -614,6 +667,7 @@ const RequestorGroups = () => {
                 id="defaultCountry"
                 value={formData.defaultCountry}
                 onChange={(country) => setFormData({ ...formData, defaultCountry: country })}
+                disabled={joiningLinkOnly}
                 required
               />
             </div>
@@ -638,6 +692,38 @@ const RequestorGroups = () => {
                      value={formData.defaultPostalCode}
                      onChange={(e) => setFormData({ ...formData, defaultPostalCode: e.target.value })} required />
             </div>
+          </div>
+          </fieldset>
+
+          <hr />
+          <h6 className="text-muted">{t('requestorGroups.form.joiningInfo')}</h6>
+
+          <div className="mb-3">
+            <label htmlFor="joiningUrl" className="form-label">{t('requestorGroups.form.joiningUrl')}</label>
+            <input
+              type="url"
+              className="form-control"
+              id="joiningUrl"
+              value={formData.joiningUrl}
+              onChange={(e) => setFormData({ ...formData, joiningUrl: e.target.value })}
+              placeholder={t('requestorGroups.form.joiningUrlPlaceholder')}
+              maxLength={500}
+            />
+            <div className="form-text">
+              {t('requestorGroups.form.joiningUrlHelp')}
+              {formData.joiningUrl.trim() && validateJoiningUrl(formData.joiningUrl) && (
+                <span className="text-danger ms-2">
+                  <i className="fas fa-exclamation-circle me-1"></i>
+                  {validateJoiningUrl(formData.joiningUrl)}
+                </span>
+              )}
+            </div>
+            {editingGroup?.publicJoinUrl && (
+              <div className="form-text">
+                {t('requestorGroups.form.publicJoinUrl')}{' '}
+                <code style={{ wordBreak: 'break-all' }}>{editingGroup.publicJoinUrl}</code>
+              </div>
+            )}
           </div>
 
         </form>
@@ -697,6 +783,30 @@ const RequestorGroups = () => {
                     <span className="text-muted fst-italic">{t('requestorGroups.detail.introspectionNotConfigured')}</span>
                   )}
                 </p>
+              </div>
+            </div>
+
+            <div className="row mb-4">
+              <div className="col-12">
+                <h6 className="text-muted mb-1">{t('requestorGroups.detail.joiningUrl')}</h6>
+                {selectedGroup.joiningUrl ? (
+                  <>
+                    <p className="mb-1">
+                      <a href={selectedGroup.joiningUrl} target="_blank" rel="noopener noreferrer"
+                         style={{ wordBreak: 'break-all' }}>
+                        {selectedGroup.joiningUrl}
+                      </a>
+                    </p>
+                    {selectedGroup.publicJoinUrl && (
+                      <p className="small text-muted mb-0">
+                        {t('requestorGroups.detail.publicJoinUrl')}{' '}
+                        <code style={{ wordBreak: 'break-all' }}>{selectedGroup.publicJoinUrl}</code>
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-muted fst-italic mb-0">{t('requestorGroups.detail.joiningUrlNotSet')}</p>
+                )}
               </div>
             </div>
 

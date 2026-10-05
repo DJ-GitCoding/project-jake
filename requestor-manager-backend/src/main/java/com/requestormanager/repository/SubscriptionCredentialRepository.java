@@ -38,6 +38,11 @@ public interface SubscriptionCredentialRepository extends JpaRepository<Subscrip
            "WHERE sc.subscriptionRequest.dataHolderGroup.id = :dataHolderGroupId AND sc.isActive = true")
     List<SubscriptionCredential> findActiveByDataHolderGroupId(Long dataHolderGroupId);
 
+    /** Active credentials of one requestor group's subscriptions, whose clients carry its joining link. */
+    @Query("SELECT sc FROM SubscriptionCredential sc " +
+           "WHERE sc.subscriptionRequest.requestorGroup.id = :requestorGroupId AND sc.isActive = true")
+    List<SubscriptionCredential> findActiveByRequestorGroupId(Long requestorGroupId);
+
     /**
      * Find all active credentials
      */

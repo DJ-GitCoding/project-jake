@@ -247,6 +247,7 @@
       "codeTooLong": "Code must be 10 characters or less",
       "codeFormat": "Code must be alphanumeric with hyphens, cannot start/end with hyphen",
       "codeAlphanumeric": "Code must be alphanumeric",
+      "joiningUrlFormat": "The joining link must be a full web address starting with https:// or http://",
       "nameRequired": "Group name is required",
       "codeRequired": "A group code is required. Data holders identify this group by it.",
       "introspectionUrlRequired": "A default introspection URL is required. Data holders validate this group's tokens with it.",
@@ -301,7 +302,13 @@
       "stateProvince": "State / Province",
       "postalCode": "Postal Code",
       "country": "Country",
-      "addressInfoRequiredHelp": "Used to prefill a subscription request when this group is selected."
+      "addressInfoRequiredHelp": "Used to prefill a subscription request when this group is selected.",
+      "joiningInfo": "Joining",
+      "joiningUrl": "Joining Link",
+      "joiningUrlPlaceholder": "https://example.org/apply",
+      "joiningUrlHelp": "Optional. Where someone can apply to join this group, such as your application form. Data holders that offer requestor group links list it under \"Public Information Services\" when they answer a public lookup.",
+      "publicJoinUrl": "Data holders hand out:",
+      "joiningLinkOnlyNotice": "As a requestor group admin you can change this group's joining link. The other details are managed by your administrators."
     },
     "detail": {
       "title": "Group: {{name}}",
@@ -310,6 +317,9 @@
       "description": "Description",
       "introspectionUrl": "Default Introspection URL",
       "introspectionNotConfigured": "Not configured — will need to be set per subscription",
+      "joiningUrl": "Joining Link",
+      "joiningUrlNotSet": "No joining link. Data holders will not list this group in public answers.",
+      "publicJoinUrl": "Public link given out by data holders:",
       "createdBy": "Created By",
       "createdAt": "Created At",
       "activeAgreements": "Active Agreements ({{count}})",

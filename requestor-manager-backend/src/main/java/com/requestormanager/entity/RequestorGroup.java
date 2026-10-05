@@ -82,6 +82,16 @@ public class RequestorGroup {
     @Column(name = "default_introspection_url", length = 500)
     private String defaultIntrospectionUrl;
 
+    /**
+     * Where someone who wants to join this group signs up, typically the group's own
+     * application form. Optional. When set, this requestor manager serves a public redirect to
+     * it and reports that redirect as the {@code joining_url} claim of this group's introspection
+     * clients, so data holders can read it through introspection and list it with their public
+     * RDAP answers.
+     */
+    @Column(name = "joining_url", length = 500)
+    private String joiningUrl;
+
     // ==================== Timestamps and Audit ====================
     
     @Column(name = "created_at", nullable = false, updatable = false)

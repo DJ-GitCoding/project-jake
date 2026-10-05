@@ -27,6 +27,52 @@ import { useAuth } from '../contexts/AuthContext';
 
 const EMPTY_FORM = { name: '', baseUrl: '', clientId: '', clientSecret: '' };
 
+/** One global on/off setting: its title and description, and a switch that saves immediately. */
+const ConfigToggleRow = ({ title, description, on, onColor, onTint, onBorder, onToggle, busy, style }) => (
+  <div style={{
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '16px 20px', borderRadius: '12px',
+    background: on ? onTint : 'var(--bg-tertiary)',
+    border: `1px solid ${on ? onBorder : 'var(--border-primary)'}`,
+    ...style,
+  }}>
+    <div style={{ flex: 1 }}>
+      <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>
+        {title}
+      </div>
+      <div className="text-muted small" style={{ maxWidth: 500 }}>
+        {description}
+      </div>
+    </div>
+    <div style={{ flexShrink: 0, marginLeft: 24 }}>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-label={title}
+        onClick={onToggle}
+        disabled={busy}
+        style={{
+          position: 'relative',
+          width: 52, height: 28, borderRadius: 14,
+          border: 'none', cursor: busy ? 'wait' : 'pointer',
+          background: on ? onColor : 'var(--text-muted)',
+          transition: 'background 0.2s ease',
+        }}
+      >
+        <span style={{
+          position: 'absolute',
+          top: 3, left: on ? 26 : 3,
+          width: 22, height: 22, borderRadius: '50%',
+          background: 'white',
+          transition: 'left 0.2s ease',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+        }} />
+      </button>
+    </div>
+  </div>
+);
+
 const TAB_CONNECTIONS = 'connections';
 const TAB_BRANDING = 'branding';
 
@@ -92,6 +138,24 @@ const Settings = () => {
         toast.success(newValue
           ? t('settings.manualReviewEnabled')
           : t('settings.manualReviewDisabled'));
+      }
+    } catch (error) {
+      toast.error(t('settings.updateConfigFailed'));
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
+  const handleToggleRequestorGroupLinks = async () => {
+    const newValue = !globalConfig?.offerRequestorGroupLinks;
+    setSavingConfig(true);
+    try {
+      const response = await updateDataHolderConfig({ offerRequestorGroupLinks: newValue });
+      if (response.data.success) {
+        setGlobalConfig(response.data.config);
+        toast.success(newValue
+          ? t('settings.offerRequestorGroupLinksEnabled')
+          : t('settings.offerRequestorGroupLinksDisabled'));
       }
     } catch (error) {
       toast.error(t('settings.updateConfigFailed'));
@@ -239,56 +303,36 @@ const Settings = () => {
           <h3><i className="fa-solid fa-gear"></i> {t('settings.requestControls')}</h3>
         </div>
         <div className="card-body" style={{ padding: '24px' }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '16px 20px', borderRadius: '12px',
-            background: globalConfig?.requireManualReviewAll
-              ? 'rgba(245, 158, 11, 0.08)'
-              : 'var(--bg-tertiary)',
-            border: `1px solid ${globalConfig?.requireManualReviewAll
-              ? 'rgba(245, 158, 11, 0.25)'
-              : 'var(--border-primary)'}`,
-          }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>
-                {t('settings.requireManualReviewTitle')}
-              </div>
-              <div className="text-muted small" style={{ maxWidth: 500 }}>
-                {globalConfig?.requireManualReviewAll
-                  ? t('settings.manualReviewAllDescription')
-                  : t('settings.manualReviewDefaultDescription')}
-              </div>
-              {globalConfig?.updatedBy && globalConfig?.updatedAt && (
-                <div className="text-muted small" style={{ marginTop: 8, fontSize: 11 }}>
-                  {t('settings.lastChangedBy')} <strong>{globalConfig.updatedBy}</strong> {t('settings.lastChangedAt', { date: new Date(globalConfig.updatedAt).toLocaleString() })}
-                </div>
-              )}
+          <ConfigToggleRow
+            title={t('settings.requireManualReviewTitle')}
+            description={globalConfig?.requireManualReviewAll
+              ? t('settings.manualReviewAllDescription')
+              : t('settings.manualReviewDefaultDescription')}
+            on={Boolean(globalConfig?.requireManualReviewAll)}
+            onColor="var(--accent-warning)"
+            onTint="rgba(245, 158, 11, 0.08)"
+            onBorder="rgba(245, 158, 11, 0.25)"
+            onToggle={handleToggleManualReview}
+            busy={savingConfig}
+          />
+          <ConfigToggleRow
+            title={t('settings.offerRequestorGroupLinksTitle')}
+            description={globalConfig?.offerRequestorGroupLinks
+              ? t('settings.offerRequestorGroupLinksOnDescription')
+              : t('settings.offerRequestorGroupLinksOffDescription')}
+            on={Boolean(globalConfig?.offerRequestorGroupLinks)}
+            onColor="var(--accent-success)"
+            onTint="rgba(16, 185, 129, 0.08)"
+            onBorder="rgba(16, 185, 129, 0.25)"
+            onToggle={handleToggleRequestorGroupLinks}
+            busy={savingConfig}
+            style={{ marginTop: 12 }}
+          />
+          {globalConfig?.updatedBy && globalConfig?.updatedAt && (
+            <div className="text-muted small" style={{ marginTop: 12, fontSize: 11 }}>
+              {t('settings.lastChangedBy')} <strong>{globalConfig.updatedBy}</strong> {t('settings.lastChangedAt', { date: new Date(globalConfig.updatedAt).toLocaleString() })}
             </div>
-            <div style={{ flexShrink: 0, marginLeft: 24 }}>
-              <button
-                onClick={handleToggleManualReview}
-                disabled={savingConfig}
-                style={{
-                  position: 'relative',
-                  width: 52, height: 28, borderRadius: 14,
-                  border: 'none', cursor: savingConfig ? 'wait' : 'pointer',
-                  background: globalConfig?.requireManualReviewAll
-                    ? 'var(--accent-warning)'
-                    : 'var(--text-muted)',
-                  transition: 'background 0.2s ease',
-                }}
-              >
-                <span style={{
-                  position: 'absolute',
-                  top: 3, left: globalConfig?.requireManualReviewAll ? 26 : 3,
-                  width: 22, height: 22, borderRadius: '50%',
-                  background: 'white',
-                  transition: 'left 0.2s ease',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                }} />
-              </button>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 

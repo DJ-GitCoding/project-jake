@@ -56,11 +56,7 @@ public class AdminController {
                 });
         return ResponseEntity.ok(Map.of(
                 "success", true,
-                "config", Map.of(
-                        "requireManualReviewAll", config.getRequireManualReviewAll(),
-                        "updatedAt", config.getUpdatedAt() != null ? config.getUpdatedAt().toString() : "",
-                        "updatedBy", config.getUpdatedBy() != null ? config.getUpdatedBy() : ""
-                )
+                "config", configView(config)
         ));
     }
 
@@ -75,20 +71,28 @@ public class AdminController {
         if (body.containsKey("requireManualReviewAll")) {
             config.setRequireManualReviewAll(Boolean.TRUE.equals(body.get("requireManualReviewAll")));
         }
+        if (body.containsKey("offerRequestorGroupLinks")) {
+            config.setOfferRequestorGroupLinks(Boolean.TRUE.equals(body.get("offerRequestorGroupLinks")));
+        }
         config.setUpdatedBy((String) body.getOrDefault("updatedBy", "admin"));
 
         config = configRepository.save(config);
-        log.info("Global config updated: requireManualReviewAll={} by {}",
-                config.getRequireManualReviewAll(), config.getUpdatedBy());
+        log.info("Global config updated: requireManualReviewAll={}, offerRequestorGroupLinks={} by {}",
+                config.getRequireManualReviewAll(), config.getOfferRequestorGroupLinks(), config.getUpdatedBy());
 
         return ResponseEntity.ok(Map.of(
                 "success", true,
-                "config", Map.of(
-                        "requireManualReviewAll", config.getRequireManualReviewAll(),
-                        "updatedAt", config.getUpdatedAt() != null ? config.getUpdatedAt().toString() : "",
-                        "updatedBy", config.getUpdatedBy() != null ? config.getUpdatedBy() : ""
-                )
+                "config", configView(config)
         ));
+    }
+
+    private Map<String, Object> configView(DataHolderConfig config) {
+        return Map.of(
+                "requireManualReviewAll", config.getRequireManualReviewAll(),
+                "offerRequestorGroupLinks", Boolean.TRUE.equals(config.getOfferRequestorGroupLinks()),
+                "updatedAt", config.getUpdatedAt() != null ? config.getUpdatedAt().toString() : "",
+                "updatedBy", config.getUpdatedBy() != null ? config.getUpdatedBy() : ""
+        );
     }
 
     // ==================== Pending Requests ====================

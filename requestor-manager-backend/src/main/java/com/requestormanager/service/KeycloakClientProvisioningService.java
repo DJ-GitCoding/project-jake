@@ -40,6 +40,11 @@ public class KeycloakClientProvisioningService {
      */
     private static final String INTROSPECTION_ROLE = "introspect";
 
+    /** Introspection-response claim carrying the requestor group's public joining link. */
+    public static final String JOINING_URL_CLAIM = "joining_url";
+    private static final String JOINING_URL_MAPPER = "joining-url";
+    private static final String SELF_AUDIENCE_MAPPER = "self-audience";
+
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
@@ -92,7 +97,8 @@ public class KeycloakClientProvisioningService {
      */
     public ProvisionedClient provisionClient(String subscriptionInternalId,
                                               String dataHolderGroupCode,
-                                              String requestorGroupName) {
+                                              String requestorGroupName,
+                                              String joiningUrl) {
         String adminToken = getAdminToken();
         String clientId = buildClientId(subscriptionInternalId);
 
@@ -107,6 +113,7 @@ public class KeycloakClientProvisioningService {
             String secret = regenerateClientSecret(adminToken, existingUuid);
             // Re-assert the audience grant: re-provisioning must converge on a working client.
             grantIntrospectionAudience(adminToken, existingUuid, clientId, requestorGroupName);
+            applyJoiningUrlClaim(adminToken, existingUuid, clientId, joiningUrl);
             return new ProvisionedClient(clientId, existingUuid, secret, introspectUrl, tokenUrl);
         }
 
@@ -150,6 +157,7 @@ public class KeycloakClientProvisioningService {
 
             // Without this the client can authenticate but Keycloak still refuses to introspect.
             grantIntrospectionAudience(adminToken, clientUuid, clientId, requestorGroupName);
+            applyJoiningUrlClaim(adminToken, clientUuid, clientId, joiningUrl);
 
             log.info("Successfully provisioned Keycloak client '{}' (uuid: {})", clientId, clientUuid);
 
@@ -328,6 +336,150 @@ public class KeycloakClientProvisioningService {
                     clientId, requestorGroupName, e.getMessage());
             return AudienceState.FAILED;
         }
+    }
+
+    // ==================== Joining link ====================
+
+    /** One introspection client and the joining link its introspection responses should carry. */
+    public record JoiningUrlClaim(String clientUuid, String clientId, String joiningUrl) {}
+
+    /**
+     * Bring each client's {@value #JOINING_URL_CLAIM} claim in line with its requestor group's
+     * joining link, under one admin token.
+     *
+     * @return how many clients now match; a client Keycloak could not update is left for the next run
+     */
+    public int syncJoiningUrlClaims(List<JoiningUrlClaim> claims) {
+        if (claims.isEmpty()) return 0;
+        String adminToken = getAdminToken();
+        int ok = 0;
+        for (JoiningUrlClaim claim : claims) {
+            if (applyJoiningUrlClaim(adminToken, claim.clientUuid(), claim.clientId(), claim.joiningUrl())) ok++;
+        }
+        return ok;
+    }
+
+    /**
+     * Make this introspection client report the requestor group's joining link, or stop reporting
+     * one when {@code joiningUrl} is null.
+     *
+     * <p>The claim is a hardcoded claim added to introspection responses only, never to the access
+     * token. Keycloak puts a client's mappers into the tokens issued to that client, so the claim is
+     * read by introspecting the client's own client-credentials token: a data holder holding these
+     * credentials can learn the link without any requestor's token, which is what a public query
+     * needs. Keycloak only introspects a token for a client in its audience, so the client is also
+     * given an audience mapper naming itself — it then can introspect its own token and, as before,
+     * the group members' tokens that carry its role.
+     *
+     * <p>Failures are logged and reported, never thrown: the client keeps working for token
+     * introspection either way, and the sync job retries.
+     */
+    private boolean applyJoiningUrlClaim(String adminToken, String clientUuid, String clientId, String joiningUrl) {
+        try {
+            List<Map<String, Object>> mappers = getProtocolMappers(adminToken, clientUuid);
+            Map<String, Object> claimMapper = findMapper(mappers, JOINING_URL_MAPPER);
+            Map<String, Object> audienceMapper = findMapper(mappers, SELF_AUDIENCE_MAPPER);
+
+            if (joiningUrl == null) {
+                if (claimMapper != null) deleteProtocolMapper(adminToken, clientUuid, (String) claimMapper.get("id"));
+                if (audienceMapper != null) deleteProtocolMapper(adminToken, clientUuid, (String) audienceMapper.get("id"));
+                if (claimMapper != null) log.info("Removed the joining link from introspection client '{}'", clientId);
+                return true;
+            }
+
+            if (audienceMapper == null) {
+                createProtocolMapper(adminToken, clientUuid, selfAudienceMapper(clientId));
+            }
+
+            Map<String, Object> wanted = joiningUrlMapper(joiningUrl);
+            if (claimMapper == null) {
+                createProtocolMapper(adminToken, clientUuid, wanted);
+                log.info("Introspection client '{}' now reports joining link {}", clientId, joiningUrl);
+            } else {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> config = (Map<String, Object>) claimMapper.get("config");
+                if (config == null || !joiningUrl.equals(config.get("claim.value"))) {
+                    wanted.put("id", claimMapper.get("id"));
+                    updateProtocolMapper(adminToken, clientUuid, (String) claimMapper.get("id"), wanted);
+                    log.info("Introspection client '{}' now reports joining link {}", clientId, joiningUrl);
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            log.warn("Could not set the joining link on introspection client '{}': {}", clientId, e.getMessage());
+            return false;
+        }
+    }
+
+    private Map<String, Object> joiningUrlMapper(String joiningUrl) {
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("claim.name", JOINING_URL_CLAIM);
+        config.put("claim.value", joiningUrl);
+        config.put("jsonType.label", "String");
+        config.put("access.token.claim", "false");
+        config.put("id.token.claim", "false");
+        config.put("userinfo.token.claim", "false");
+        config.put("introspection.token.claim", "true");
+
+        Map<String, Object> mapper = new LinkedHashMap<>();
+        mapper.put("name", JOINING_URL_MAPPER);
+        mapper.put("protocol", "openid-connect");
+        mapper.put("protocolMapper", "oidc-hardcoded-claim-mapper");
+        mapper.put("config", config);
+        return mapper;
+    }
+
+    private Map<String, Object> selfAudienceMapper(String clientId) {
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("included.client.audience", clientId);
+        config.put("access.token.claim", "true");
+        config.put("id.token.claim", "false");
+        config.put("introspection.token.claim", "true");
+
+        Map<String, Object> mapper = new LinkedHashMap<>();
+        mapper.put("name", SELF_AUDIENCE_MAPPER);
+        mapper.put("protocol", "openid-connect");
+        mapper.put("protocolMapper", "oidc-audience-mapper");
+        mapper.put("config", config);
+        return mapper;
+    }
+
+    private static Map<String, Object> findMapper(List<Map<String, Object>> mappers, String name) {
+        return mappers.stream().filter(m -> name.equals(m.get("name"))).findFirst().orElse(null);
+    }
+
+    private List<Map<String, Object>> getProtocolMappers(String adminToken, String clientUuid) throws Exception {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(adminToken);
+        ResponseEntity<String> response = restTemplate.exchange(
+                adminUrl + "/clients/" + clientUuid + "/protocol-mappers/models",
+                HttpMethod.GET, new HttpEntity<>(headers), String.class);
+        if (response.getBody() == null) return List.of();
+        return objectMapper.readValue(response.getBody(), new TypeReference<>() {});
+    }
+
+    private void createProtocolMapper(String adminToken, String clientUuid, Map<String, Object> mapper) {
+        restTemplate.exchange(adminUrl + "/clients/" + clientUuid + "/protocol-mappers/models",
+                HttpMethod.POST, new HttpEntity<>(mapper, jsonHeaders(adminToken)), String.class);
+    }
+
+    private void updateProtocolMapper(String adminToken, String clientUuid, String mapperId, Map<String, Object> mapper) {
+        restTemplate.exchange(adminUrl + "/clients/" + clientUuid + "/protocol-mappers/models/" + mapperId,
+                HttpMethod.PUT, new HttpEntity<>(mapper, jsonHeaders(adminToken)), String.class);
+    }
+
+    private void deleteProtocolMapper(String adminToken, String clientUuid, String mapperId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(adminToken);
+        restTemplate.exchange(adminUrl + "/clients/" + clientUuid + "/protocol-mappers/models/" + mapperId,
+                HttpMethod.DELETE, new HttpEntity<>(headers), String.class);
+    }
+
+    private static HttpHeaders jsonHeaders(String adminToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(adminToken);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return headers;
     }
 
     /**

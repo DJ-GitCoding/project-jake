@@ -124,8 +124,11 @@ public class RdapService {
         } else {
             accessLevel = accessControlService.unscopedAccessLevel();
         }
-        return processRequest(qType, qVal, accessLevel, auth.getTokenInfo(), clientIp, codeRef,
+        RdapQueryResult result = processRequest(qType, qVal, accessLevel, auth.getTokenInfo(), clientIp, codeRef,
                 entityOpt.get(), startTime, auth.isAdmin(), confidential, exigent, jakeCompliance, customParams);
+        // Answered as the public: no agreement was invoked and no administrator asked.
+        result.setPublicQuery(!scoped && !auth.isAdmin());
+        return result;
     }
 
     // ==================== PENDING REQUEST CHECK ====================
@@ -1215,6 +1218,7 @@ public class RdapService {
         private List<Map<String, Object>> customTableData;
         private boolean jakeCompliance;
         private String requestorGroupCode;
+        private boolean publicQuery;
 
         private RdapQueryResult(boolean s, RdapEntity e, String qt, String qv, int al, List<String> an, Integer ec, String et, String em, UUID ri, LocalDateTime ea, boolean p, AgreementRequestType rrt) {
             success = s; entity = e; queryType = qt; queryValue = qv; accessLevel = al; agreementNames = an; errorCode = ec; errorTitle = et; errorMessage = em; requestId = ri; expiresAt = ea; pending = p; resolvedRequestType = rrt;
@@ -1233,5 +1237,7 @@ public class RdapService {
         public void setJakeCompliance(boolean jc) { this.jakeCompliance = jc; }
         public String getRequestorGroupCode() { return requestorGroupCode; }
         public void setRequestorGroupCode(String rgc) { this.requestorGroupCode = rgc; }
+        public boolean isPublicQuery() { return publicQuery; }
+        public void setPublicQuery(boolean pq) { this.publicQuery = pq; }
     }
 }
