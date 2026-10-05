@@ -11,6 +11,7 @@ package com.requestormanager.controller;
 import com.requestormanager.dto.ApiResponse;
 import com.requestormanager.dto.PagedResponse;
 import com.requestormanager.dto.RequestorGroupDto;
+import com.requestormanager.service.MemberProfileService;
 import com.requestormanager.service.RequestorGroupService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -28,6 +29,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/requestor-groups")
@@ -37,6 +39,24 @@ import java.util.List;
 public class RequestorGroupController {
     
     private final RequestorGroupService requestorGroupService;
+    private final MemberProfileService memberProfileService;
+
+    @GetMapping("/{id}/user-fields")
+    @Operation(summary = "List the group's custom member fields",
+               description = "Fields the group's members fill in on their profile, beyond the standard ones.")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getUserFields(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(memberProfileService.getGroupFields(id)));
+    }
+
+    @PutMapping("/{id}/user-fields")
+    @Operation(summary = "Replace the group's custom member fields",
+               description = "Entries with an id update that field, entries without one are created, and fields "
+                           + "left out are removed along with members' values for them. Group admins only.")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> replaceUserFields(
+            @PathVariable Long id, @RequestBody List<Map<String, Object>> fields) {
+        return ResponseEntity.ok(ApiResponse.success("Member fields saved",
+                memberProfileService.replaceGroupFields(id, fields)));
+    }
     
     @PostMapping
     @Operation(summary = "Create requestor group", description = "Create a new requestor group (Master and Admin only)")

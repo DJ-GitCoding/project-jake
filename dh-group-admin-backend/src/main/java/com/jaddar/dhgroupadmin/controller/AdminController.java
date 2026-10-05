@@ -319,6 +319,10 @@ public class AdminController {
         if (fieldError != null) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", fieldError));
         }
+        String userFieldError = replaceUserFields(template, request.getUserFields());
+        if (userFieldError != null) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", userFieldError));
+        }
 
         if (request.getRequestTypes() != null) {
             String nameError = validateUniqueTypeNames(request.getRequestTypes());
@@ -397,6 +401,12 @@ public class AdminController {
                         String fieldError = replaceSubscriptionFields(template, request.getSubscriptionFields());
                         if (fieldError != null) {
                             return ResponseEntity.badRequest().body(Map.of("success", false, "message", fieldError));
+                        }
+                    }
+                    if (request.getUserFields() != null) {
+                        String userFieldError = replaceUserFields(template, request.getUserFields());
+                        if (userFieldError != null) {
+                            return ResponseEntity.badRequest().body(Map.of("success", false, "message", userFieldError));
                         }
                     }
 
@@ -665,6 +675,7 @@ public class AdminController {
         if (snapshot == null) return false;
         return Objects.equals(snapshot.get("legalSections"), current.get("legalSections"))
                 && Objects.equals(snapshot.get("subscriptionFields"), current.get("subscriptionFields"))
+                && Objects.equals(snapshot.getOrDefault("userFields", List.of()), current.get("userFields"))
                 && Objects.equals(snapshot.get("requestTypes"), current.get("requestTypes"));
     }
 
@@ -984,6 +995,7 @@ public class AdminController {
                     entry.put("name", c.getName());
                     entry.put("description", c.getDescription());
                     entry.put("passed", c.isPassed());
+                    entry.put("pending", c.isPending());
                     entry.put("message", c.getErrorMessage());
                     entry.put("detail", c.getInternalDetail());
                     return entry;
@@ -2348,6 +2360,7 @@ public class AdminController {
         private String requiredGroupTypes;
         private List<LegalSectionRequest> legalSections;
         private List<SubscriptionFieldRequest> subscriptionFields;
+        private List<UserFieldRequest> userFields;
         private Integer maxQueriesPerDay; private Integer maxQueriesPerMonth;
         /** isPublished is the old name for isActive; either may be sent. */
         private Boolean isActive; private Boolean isPublished; private String createdBy;
@@ -2372,6 +2385,7 @@ public class AdminController {
         private String requiredGroupTypes;
         private List<LegalSectionRequest> legalSections;
         private List<SubscriptionFieldRequest> subscriptionFields;
+        private List<UserFieldRequest> userFields;
         private Integer maxQueriesPerDay; private Integer maxQueriesPerMonth;
         /** isPublished is the old name for isActive; either may be sent. */
         private Boolean isActive; private Boolean isPublished;
@@ -2532,6 +2546,46 @@ public class AdminController {
             order++;
         }
         return null;
+    }
+
+    /** Replace the template's required member fields. */
+    private String replaceUserFields(AgreementTemplate template, List<UserFieldRequest> fields) {
+        template.getUserFields().clear();
+        if (fields == null) return null;
+        Set<String> seen = new HashSet<>();
+        int order = 0;
+        for (UserFieldRequest req : fields) {
+            String requestedKey = req.getKey() != null ? req.getKey().trim() : "";
+            boolean standard = TemplateUserField.STANDARD.containsKey(requestedKey);
+            String label = standard ? TemplateUserField.STANDARD.get(requestedKey)
+                    : (req.getLabel() != null ? req.getLabel().trim() : "");
+            if (label.isEmpty()) continue;
+            String key = standard ? requestedKey : TemplateUserField.keyFor(label);
+            if (key.isEmpty()) {
+                return "The member field '" + label + "' needs a name with at least one letter or digit.";
+            }
+            if (!standard && TemplateUserField.STANDARD.containsKey(key)) {
+                return "'" + label + "' is a standard member field; add it from the standard fields instead.";
+            }
+            if (!seen.add(key)) {
+                return "The member field '" + label + "' is listed twice. Each field may appear once.";
+            }
+            template.addUserField(TemplateUserField.builder()
+                    .key(key)
+                    .label(label.length() > 200 ? label.substring(0, 200) : label)
+                    .description(req.getDescription() != null && !req.getDescription().isBlank()
+                            ? req.getDescription().trim() : null)
+                    .standard(standard)
+                    .sortOrder(req.getSortOrder() != null ? req.getSortOrder() : order)
+                    .build());
+            order++;
+        }
+        return null;
+    }
+
+    @Data public static class UserFieldRequest {
+        private String key;
+        private String label; private String description; private Integer sortOrder;
     }
 
     @Data public static class LegalSectionRequest {

@@ -24,6 +24,7 @@ export default [
     route("data-holder-groups", "routes/data-holder-groups.jsx"),
     route("users", "routes/users.jsx"),
     route("settings", "routes/settings.jsx"),
+    route("profile", "routes/profile.jsx"),
   ]),
   route("*", "routes/not-found.jsx"),
 ];

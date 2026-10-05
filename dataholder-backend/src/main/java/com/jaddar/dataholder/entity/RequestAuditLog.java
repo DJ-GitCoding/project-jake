@@ -98,6 +98,10 @@ public class RequestAuditLog {
     @Column(name = "requestor_ip")
     private String requestorIp;
 
+    @Column(name = "requestor_user_fields", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    private java.util.Map<String, String> requestorUserFields;
+
     @Column(name = "agreement_names", columnDefinition = "text[]")
     @JdbcTypeCode(SqlTypes.ARRAY)
     private String[] agreementNames;

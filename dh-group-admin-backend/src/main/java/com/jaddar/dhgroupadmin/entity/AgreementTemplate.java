@@ -63,6 +63,11 @@ public class AgreementTemplate {
     @Builder.Default
     private List<TemplateSubscriptionField> subscriptionFields = new ArrayList<>();
 
+    @OneToMany(mappedBy = "template", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("sortOrder ASC, id ASC")
+    @Builder.Default
+    private List<TemplateUserField> userFields = new ArrayList<>();
+
     /**
      * Controls how field data is disclosed for this template.
      * One of: "open" (shown as-is), "hashed" (shown hashed), "omit" (excluded).
@@ -181,6 +186,11 @@ public class AgreementTemplate {
 
     public void addSubscriptionField(TemplateSubscriptionField field) {
         subscriptionFields.add(field);
+        field.setTemplate(this);
+    }
+
+    public void addUserField(TemplateUserField field) {
+        userFields.add(field);
         field.setTemplate(this);
     }
 

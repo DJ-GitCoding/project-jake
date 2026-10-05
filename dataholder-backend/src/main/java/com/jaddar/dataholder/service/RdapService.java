@@ -103,8 +103,18 @@ public class RdapService {
             String authHeader, String clientIp, Map<String, Object> customParams) {
         long startTime = System.currentTimeMillis();
         boolean scoped = requestorGroupCode != null && requestTypeCode != null && !requestTypeCode.isBlank();
-        AuthResult auth = scoped ? authenticate(authHeader, requestorGroupCode) : authenticateOrPublic(authHeader);
+        AuthResult auth = scoped ? authenticate(authHeader, requestorGroupCode, requestTypeCode) : authenticateOrPublic(authHeader);
         if (!auth.isSuccess()) return RdapQueryResult.error(401, "Unauthorized", auth.getMessage(), qType, qVal);
+
+        List<Map<String, String>> missingFields = auth.getTokenInfo() != null ? auth.getTokenInfo().getMissingUserFields() : null;
+        if (scoped && !auth.isAdmin() && missingFields != null && !missingFields.isEmpty()) {
+            String labels = missingFields.stream().map(f -> f.get("label")).collect(java.util.stream.Collectors.joining(", "));
+            String message = "Your profile is missing information this agreement requires: " + labels
+                    + ". Add it on your profile in the requestor manager, then try again.";
+            logRequest(qType, qVal, 0, auth.getTokenInfo(), clientIp, buildCodeRef(requestorGroupCode, requestTypeCode),
+                    PendingRequest.Status.DENIED, message, startTime, confidential, exigent, jakeCompliance, customParams);
+            return RdapQueryResult.error(403, "Forbidden", message, qType, qVal);
+        }
 
         List<String> codeRef = scoped ? buildCodeRef(requestorGroupCode, requestTypeCode) : List.of();
         Optional<RdapEntity> entityOpt = resolveEntity(qType, qVal);
@@ -483,11 +493,15 @@ public class RdapService {
      *                           public query that carries none
      */
     private AuthResult authenticate(String authHeader, String requestorGroupCode) {
+        return authenticate(authHeader, requestorGroupCode, null);
+    }
+
+    private AuthResult authenticate(String authHeader, String requestorGroupCode, String requestTypeCode) {
         if (isAdmin(authHeader)) return AuthResult.admin(adminTokenInfo());
         String token = tokenIntrospectionService.extractToken(authHeader);
         if (token == null) return AuthResult.failure("Bearer token required");
         TokenIntrospectionService.SubscriptionIntrospection introspection =
-                tokenIntrospectionService.introspectForSubscription(token, requestorGroupCode);
+                tokenIntrospectionService.introspectForSubscription(token, requestorGroupCode, requestTypeCode);
         return introspection.isActive()
                 ? AuthResult.user(introspection.tokenInfo())
                 : AuthResult.failure(introspection.outcome().getUserMessage());
@@ -671,6 +685,7 @@ public class RdapService {
             .status(PendingRequest.Status.PENDING).autoApproved(false)
             .confidential(confidential).exigent(exigent).jakeCompliance(jakeCompliance)
             .customParams(customParams)
+            .requestorUserFields(info.getUserFields())
             .responseTimeMs((int)(System.currentTimeMillis() - start))
             .expiresAt(LocalDateTime.now().plusHours(24)).build();
         pendingRequestRepository.save(r);
@@ -732,6 +747,7 @@ public class RdapService {
             .status(status).autoApproved(true)
             .confidential(confidential).exigent(exigent).jakeCompliance(jakeCompliance)
             .customParams(customParams)
+            .requestorUserFields(info != null ? info.getUserFields() : null)
             .responseTimeMs((int)(System.currentTimeMillis() - start))
             .denialReason(reason).reviewedBy("SYSTEM").reviewedAt(LocalDateTime.now())
             .expiresAt(LocalDateTime.now().plusHours(24)).build();
@@ -743,6 +759,7 @@ public class RdapService {
             .accessLevelRequested(level)
             .accessLevelGranted(status == PendingRequest.Status.APPROVED ? level : 0)
             .result(status == PendingRequest.Status.APPROVED ? "success" : "denied").resultMessage(reason)
+            .requestorUserFields(info != null ? info.getUserFields() : null)
             .confidential(confidential).exigent(exigent).jakeCompliance(jakeCompliance)
             .responseTimeMs((int)(System.currentTimeMillis() - start)).build());
     }

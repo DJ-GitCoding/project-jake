@@ -15,6 +15,7 @@ import Modal from '../components/Modal';
 import Pagination, { DEFAULT_PAGE_SIZE } from '../components/Pagination';
 import SubscribeFlow from '../components/SubscribeFlow';
 import { buildReferenceIndex, sectionClauseLines } from '../constants/legalSections';
+import { initialMemberFieldMapping, MemberFieldSelect } from '../constants/memberFields';
 import DataHolderContact from '../components/DataHolderContact';
 import { useT } from '../i18n';
 
@@ -111,6 +112,7 @@ const getResultBadge = (result, t) => {
   switch (result) {
     case 'PASSED': return <span className="badge bg-success"><i className="fas fa-check me-1"></i>{t('subscriptions.result.passed')}</span>;
     case 'FAILED': return <span className="badge bg-danger"><i className="fas fa-times me-1"></i>{t('subscriptions.result.failed')}</span>;
+    case 'PENDING': return <span className="badge bg-warning text-dark"><i className="fas fa-hourglass-half me-1"></i>{t('subscriptions.result.pending')}</span>;
     case 'SKIPPED': return <span className="badge bg-secondary"><i className="fas fa-forward me-1"></i>{t('subscriptions.result.skipped')}</span>;
     case 'ERROR': return <span className="badge bg-warning text-dark"><i className="fas fa-exclamation-triangle me-1"></i>{t('subscriptions.result.error')}</span>;
     default: return <span className="badge bg-secondary">{result}</span>;
@@ -262,7 +264,7 @@ const isAutoHalted = (sub) =>
 // ==================== Main Component ====================
 
 const Subscriptions = () => {
-  const { isGroupAdmin, isMasterAdmin } = useAuth();
+  const { isGroupAdmin, isMasterAdmin, isRequestorGroupAdmin } = useAuth();
   const { success, error: showError, confirm } = useAlert();
   const { t } = useT();
 
@@ -293,6 +295,10 @@ const Subscriptions = () => {
   const [respondingId, setRespondingId] = useState(null);
   const [termsMode, setTermsMode] = useState('current');
   const [showRequestData, setShowRequestData] = useState(false);
+
+  const [memberMapping, setMemberMapping] = useState({});
+  const [groupMemberFields, setGroupMemberFields] = useState([]);
+  const [savingMapping, setSavingMapping] = useState(false);
 
   // Credentials this subscription's data holder group issued; the secret is write-only.
   const [credForm, setCredForm] = useState({ clientId: '', clientSecret: '' });
@@ -584,6 +590,8 @@ const Subscriptions = () => {
       }
       if (result.result === 'PASSED') {
         success(t('subscriptions.toasts.testsPassed'));
+      } else if (result.result === 'PENDING') {
+        success(t('subscriptions.toasts.testsPending'));
       } else {
         showError(t('subscriptions.toasts.testsFailed'));
       }
@@ -644,7 +652,36 @@ const Subscriptions = () => {
     setProposedAccepted([]);
     setProposedReviewed([]);
     setProposedValues({ ...(item.subscriptionFieldValues || {}) });
+    const requiredMemberFields = item.templateSnapshot?.userFields || [];
+    setGroupMemberFields([]);
+    setMemberMapping(initialMemberFieldMapping(requiredMemberFields, [], item.userFieldMapping));
+    if (requiredMemberFields.length > 0 && item.requestorGroupId) {
+      requestorGroupsApi.getUserFields(item.requestorGroupId)
+        .then((res) => {
+          const fields = res.data.data || [];
+          setGroupMemberFields(fields);
+          setMemberMapping(initialMemberFieldMapping(requiredMemberFields, fields, item.userFieldMapping));
+        })
+        .catch((err) => console.error('Failed to load member fields:', err));
+    }
     setShowDetailModal(true);
+  };
+
+  const saveMemberMapping = async () => {
+    if (!selectedItem) return;
+    setSavingMapping(true);
+    try {
+      const res = await subscriptionsApi.updateUserFieldMapping(selectedItem.id, memberMapping);
+      const updated = res.data?.data;
+      if (updated) setSelectedItem({ ...selectedItem, userFieldMapping: updated.userFieldMapping });
+      success(t('subscriptions.memberInformation.saved'));
+      loadSubscriptions();
+    } catch (err) {
+      console.error('Failed to save member field mapping:', err);
+      showError(err.response?.data?.message || t('subscriptions.memberInformation.saveFailed'));
+    } finally {
+      setSavingMapping(false);
+    }
   };
 
   const openGroupPicker = () => {
@@ -1403,6 +1440,44 @@ const Subscriptions = () => {
               </div>
             </div>
 
+            {(selectedItem.templateSnapshot?.userFields || []).length > 0 && (
+              <div className="card mb-4">
+                <div className="card-header d-flex justify-content-between align-items-center">
+                  <h6 className="mb-0"><i className="fas fa-id-card me-2"></i>{t('subscriptions.memberInformation.title')}</h6>
+                  {isRequestorGroupAdmin() && (
+                    <button className="btn btn-sm btn-primary" onClick={saveMemberMapping} disabled={savingMapping}>
+                      {savingMapping
+                        ? <><span className="spinner-border spinner-border-sm me-1"></span>{t('common.saving')}</>
+                        : <><i className="fas fa-save me-1"></i>{t('subscriptions.memberInformation.save')}</>}
+                    </button>
+                  )}
+                </div>
+                <div className="card-body">
+                  <p className="small text-muted">{t('subscriptions.memberInformation.help')}</p>
+                  {selectedItem.templateSnapshot.userFields.map((f) => (
+                    <div className="row g-2 align-items-center mb-2" key={f.key}>
+                      <div className="col-md-5">
+                        <label htmlFor={`map-${f.key}`} className="form-label mb-0">{f.label}</label>
+                        {f.description && <div className="small text-muted">{f.description}</div>}
+                      </div>
+                      <div className="col-md-7">
+                        <MemberFieldSelect
+                          id={`map-${f.key}`}
+                          value={memberMapping[f.key]}
+                          groupFields={groupMemberFields}
+                          disabled={!isRequestorGroupAdmin()}
+                          placeholder={t('subscriptions.memberInformation.unmapped')}
+                          standardLabel={t('dataHolderGroups.subscribe.standardMemberFields')}
+                          customLabel={t('dataHolderGroups.subscribe.customMemberFields')}
+                          onChange={(v) => setMemberMapping({ ...memberMapping, [f.key]: v })}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {termsProposed ? (
               <div className="alert alert-warning py-2 small">
                 {selectedItem.pendingChangeMode === 'FORCED'
@@ -1738,11 +1813,13 @@ const Subscriptions = () => {
         {testResult && (
           <div>
             {/* Overall Result Banner */}
-            <div className={`alert alert-${testResult.result === 'PASSED' ? 'success' : 'danger'} mb-4`}>
+            <div className={`alert alert-${testResult.result === 'PASSED' ? 'success' : testResult.result === 'PENDING' ? 'warning' : 'danger'} mb-4`}>
               <div className="d-flex align-items-center">
-                <i className={`fas fa-${testResult.result === 'PASSED' ? 'check-circle' : 'times-circle'} fa-2x me-3`}></i>
+                <i className={`fas fa-${testResult.result === 'PASSED' ? 'check-circle' : testResult.result === 'PENDING' ? 'hourglass-half' : 'times-circle'} fa-2x me-3`}></i>
                 <div>
-                  <h5 className="mb-1">{testResult.result === 'PASSED' ? t('subscriptions.testModal.allTestsPassed') : t('subscriptions.testModal.someTestsFailed')}</h5>
+                  <h5 className="mb-1">{testResult.result === 'PASSED' ? t('subscriptions.testModal.allTestsPassed')
+                    : testResult.result === 'PENDING' ? t('subscriptions.testModal.testsPending')
+                    : t('subscriptions.testModal.someTestsFailed')}</h5>
                   <p className="mb-0 small">{testResult.details}</p>
                 </div>
               </div>
@@ -1772,25 +1849,60 @@ const Subscriptions = () => {
                 </h6>
                 <div className="list-group">
                   {testResult.testCases.map((tc, index) => (
-                    <div key={index} className={`list-group-item list-group-item-${tc.passed ? 'success' : 'danger'} py-2`}>
+                    <div key={index} className={`list-group-item list-group-item-${tc.passed ? 'success' : tc.pending ? 'warning' : 'danger'} py-2`}>
                       <div className="d-flex justify-content-between align-items-start">
                         <div>
                           <div className="d-flex align-items-center gap-2">
-                            <i className={`fas fa-${tc.passed ? 'check' : 'times'}`}></i>
+                            <i className={`fas fa-${tc.passed ? 'check' : tc.pending ? 'hourglass-half' : 'times'}`}></i>
                             <strong>{tc.name}</strong>
                           </div>
                           <p className="mb-0 small ms-4">{tc.description}</p>
                           {tc.errorMessage && (
-                            <p className="mb-0 small text-danger ms-4"><strong>{t('subscriptions.testModal.error')}</strong> {tc.errorMessage}</p>
+                            <p className={`mb-0 small ms-4 ${tc.pending ? 'text-muted' : 'text-danger'}`}>
+                              {!tc.pending && <strong>{t('subscriptions.testModal.error')} </strong>}{tc.errorMessage}
+                            </p>
                           )}
                         </div>
-                        <span className={`badge bg-${tc.passed ? 'success' : 'danger'}`}>
-                          {tc.passed ? t('subscriptions.testModal.passed') : t('subscriptions.testModal.failed')}
+                        <span className={`badge bg-${tc.passed ? 'success' : tc.pending ? 'warning text-dark' : 'danger'}`}>
+                          {tc.passed ? t('subscriptions.testModal.passed')
+                            : tc.pending ? t('subscriptions.testModal.pending') : t('subscriptions.testModal.failed')}
                         </span>
                       </div>
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {testResult.memberInformation && (
+              <div className="mb-4">
+                <h6 className="mb-2">
+                  <i className="fas fa-id-card me-2 text-primary"></i>
+                  {t('subscriptions.testModal.memberInformation')}
+                </h6>
+                {(testResult.memberInformation.member?.name || testResult.memberInformation.member?.email) && (
+                  <p className="small text-muted mb-2">
+                    {t('subscriptions.testModal.memberCheckedFor', {
+                      member: [testResult.memberInformation.member?.name,
+                        testResult.memberInformation.member?.email && `<${testResult.memberInformation.member.email}>`]
+                        .filter(Boolean).join(' '),
+                    })}
+                  </p>
+                )}
+                <table className="table table-sm small mb-0">
+                  <tbody>
+                    {(testResult.memberInformation.fields || []).map((f) => (
+                      <tr key={f.key}>
+                        <th className="fw-normal text-muted" style={{ width: '40%' }}>{f.label}</th>
+                        <td>
+                          {f.value
+                            ? f.value
+                            : <span className="text-danger"><i className="fas fa-times-circle me-1"></i>{t('subscriptions.testModal.memberValueMissing')}</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
 
@@ -1813,6 +1925,12 @@ const Subscriptions = () => {
               <div className="alert alert-info mt-4">
                 <i className="fas fa-info-circle me-2"></i>
                 {t('subscriptions.testModal.passedMessage')}
+              </div>
+            )}
+            {testResult.result === 'PENDING' && (
+              <div className="alert alert-info mt-4">
+                <i className="fas fa-info-circle me-2"></i>
+                {t('subscriptions.testModal.pendingMessage')}
               </div>
             )}
             {testResult.result === 'FAILED' && (

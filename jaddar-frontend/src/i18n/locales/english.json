@@ -919,6 +919,9 @@
     "checkingMailbox": "Checking your RDRS registration…"
   },
   "requestTypeSelector": {
+    "missingProfileBadge": "Profile incomplete",
+    "missingProfile": "Add to your profile in the Requestor Manager to use this agreement: {{fields}}",
+    "missingProfileTitle": "This agreement requires information your profile does not have yet: {{fields}}",
     "accessBasic": "Basic",
     "accessEnhanced": "Enhanced",
     "accessFull": "Full",

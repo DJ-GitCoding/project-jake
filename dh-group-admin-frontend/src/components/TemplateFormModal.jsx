@@ -22,6 +22,18 @@ import {
   referenceOptions,
   resolveReferences,
 } from '../constants/legalSections';
+
+const STANDARD_USER_FIELDS = [
+  { key: 'first_name', label: 'First Name' },
+  { key: 'last_name', label: 'Last Name' },
+  { key: 'email', label: 'Email' },
+  { key: 'phone', label: 'Phone Number' },
+  { key: 'street_address', label: 'Street Address' },
+  { key: 'city', label: 'City' },
+  { key: 'state_province', label: 'State / Province' },
+  { key: 'postal_code', label: 'Postal Code' },
+  { key: 'country', label: 'Country' },
+];
 import ReferenceTextEditor from './ReferenceTextEditor';
 import CountrySelect from './CountrySelect';
 
@@ -808,6 +820,7 @@ const TemplateFormModal = ({ show, onHide, onSave, template = null, submitting =
     contactPostalCode: tpl?.templateContact?.postalCode || '',
     contactCountry: tpl?.templateContact?.country || '',
     subscriptionFields: (tpl?.subscriptionFields || []).map(f => ({ ...f })),
+    userFields: (tpl?.userFields || []).map(f => ({ ...f })),
     maxQueriesPerDay: tpl?.maxQueriesPerDay ?? '',
     maxQueriesPerMonth: tpl?.maxQueriesPerMonth ?? '',
     isActive: tpl?.isActive ?? false,
@@ -949,6 +962,9 @@ const TemplateFormModal = ({ show, onHide, onSave, template = null, submitting =
         .map((s, i) => ({ ...s, sortOrder: i })),
       subscriptionFields: form.subscriptionFields
         .filter(f => (f.name || '').trim())
+        .map((f, i) => ({ ...f, sortOrder: i })),
+      userFields: form.userFields
+        .filter(f => f.standard || (f.label || '').trim())
         .map((f, i) => ({ ...f, sortOrder: i })),
       dataHolderGroupId: form.dataHolderGroupId ? parseInt(form.dataHolderGroupId) : null,
       maxQueriesPerDay: form.maxQueriesPerDay ? parseInt(form.maxQueriesPerDay) : null,
@@ -1444,6 +1460,60 @@ const TemplateFormModal = ({ show, onHide, onSave, template = null, submitting =
                               <label className="form-label" style={{ fontSize: 11 }}>{t('templateFormModal.main.fieldDescription')}</label>
                               <input className="form-control form-control-sm" value={f.description || ''}
                                      onChange={e => upd({ description: e.target.value })} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="col-12">
+                  <div className="d-flex align-items-center justify-content-between mb-1">
+                    <label className="form-label mb-0">{t('templateFormModal.main.userFields')}</label>
+                    <button type="button" className="btn btn-sm btn-outline-primary"
+                            onClick={() => set('userFields', [...form.userFields, { key: '', label: '', description: '', standard: false }])}>
+                      <i className="fa-solid fa-plus me-1"></i>{t('templateFormModal.main.addUserField')}
+                    </button>
+                  </div>
+                  <div className="form-text mb-2">{t('templateFormModal.main.userFieldsHint')}</div>
+                  <div className="d-flex flex-wrap gap-3 mb-2">
+                    {STANDARD_USER_FIELDS.map(({ key, label }) => {
+                      const on = form.userFields.some(f => f.standard && f.key === key);
+                      return (
+                        <div className="form-check" key={key}>
+                          <input className="form-check-input" type="checkbox" id={`uf-std-${key}`} checked={on}
+                                 onChange={e => set('userFields', e.target.checked
+                                   ? [...form.userFields, { key, label, standard: true }]
+                                   : form.userFields.filter(f => !(f.standard && f.key === key)))} />
+                          <label className="form-check-label" htmlFor={`uf-std-${key}`} style={{ fontSize: 12 }}>{label}</label>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {form.userFields.map((f, i) => {
+                    if (f.standard) return null;
+                    const upd = (patch) => set('userFields', form.userFields.map((x, j) => j === i ? { ...x, ...patch } : x));
+                    return (
+                      <div className="card mb-2" key={i}>
+                        <div className="card-body py-2">
+                          <div className="row g-2 align-items-end">
+                            <div className="col-md-4">
+                              <label className="form-label" style={{ fontSize: 11 }}>{t('templateFormModal.main.userFieldLabel')}</label>
+                              <input className="form-control form-control-sm" value={f.label || ''}
+                                     placeholder={t('templateFormModal.main.userFieldLabelPlaceholder')}
+                                     onChange={e => upd({ label: e.target.value })} />
+                            </div>
+                            <div className="col-md-7">
+                              <label className="form-label" style={{ fontSize: 11 }}>{t('templateFormModal.main.fieldDescription')}</label>
+                              <input className="form-control form-control-sm" value={f.description || ''}
+                                     onChange={e => upd({ description: e.target.value })} />
+                            </div>
+                            <div className="col-md-1 text-end">
+                              <button type="button" className="btn btn-sm btn-outline-danger"
+                                      onClick={() => set('userFields', form.userFields.filter((_, j) => j !== i))}>
+                                <i className="fa-solid fa-trash"></i>
+                              </button>
                             </div>
                           </div>
                         </div>

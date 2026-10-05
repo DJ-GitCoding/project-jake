@@ -71,4 +71,7 @@ public class AgreementSummary {
 
     @JsonProperty("hasCredentials")
     private Boolean hasCredentials;
+
+    @JsonProperty("missingUserFields")
+    private List<java.util.Map<String, String>> missingUserFields = new ArrayList<>();
 }

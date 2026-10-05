@@ -38,7 +38,20 @@ const RDAPSearch = () => {
   const stickyRef = useRef(null);
   const sentinelRef = useRef(null);
 
-  const { showError, showAlert, showSuccess } = useAlert();
+  const alertApi = useAlert();
+
+  const requestNotices = useRef([]);
+  const trackNotice = (id) => {
+    if (id) requestNotices.current.push(id);
+    return id;
+  };
+  const showAlert = (options) => trackNotice(alertApi.showAlert(options));
+  const showError = (message, options) => trackNotice(alertApi.showError(message, options));
+  const showSuccess = (message, options) => trackNotice(alertApi.showSuccess(message, options));
+  const clearRequestNotices = () => {
+    requestNotices.current.forEach((id) => alertApi.dismissAlert(id));
+    requestNotices.current = [];
+  };
   const { t } = useT();
 
   // Detect when sticky form is stuck to show shadow
@@ -150,6 +163,7 @@ const RDAPSearch = () => {
 
   const handleSearch = async (e) => {
     e?.preventDefault();
+    clearRequestNotices();
     if (!query.trim()) { showError('Please enter a domain, IP address, or ASN'); return; }
     const missingRequired = activeCustomParams.filter(p => p.required).filter(p => { const val = customParamValues[p.name]; return val === undefined || val === null || val === ''; });
     if (missingRequired.length > 0) { showError(`Please fill in required fields: ${missingRequired.map(p => p.name).join(', ')}`); return; }

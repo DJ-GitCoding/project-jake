@@ -252,6 +252,9 @@ public class RegistryPublicationService {
                 .map(this::toRequestTypeRecord).toList());
         record.put("subscriptionFields", template.getSubscriptionFields().stream()
                 .map(this::toSubscriptionFieldRecord).toList());
+        record.put("userFields", template.getUserFields().stream()
+                .map(f -> Map.of("key", f.getKey(), "label", f.getLabel()))
+                .toList());
         record.put("legalSectionTitles", template.getLegalSections().stream()
                 .map(AgreementLegalSection::getTitle)
                 .filter(java.util.Objects::nonNull)

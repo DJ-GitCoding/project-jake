@@ -83,8 +83,26 @@
     "goToDashboard": "Go to Dashboard",
     "signIn": "Sign In"
   },
+  "profile": {
+    "title": "My Profile",
+    "subtitle": "Your contact details and the information your requestor groups ask for. Data holders verify this information when you make requests under agreements that require it.",
+    "loading": "Loading your profile...",
+    "personalInformation": "Personal Information",
+    "groupFields": "{{name}} Member Fields",
+    "emailHelp": "Your email is your sign-in name; an administrator can change it.",
+    "usedByTitle": "Required by {{agreement}} ({{dataHolderGroup}}) as \"{{asField}}\"",
+    "usedByLegend": "Agreements listed under a field require it. A highlighted agreement cannot be used until the field is filled in.",
+    "save": "Save Profile",
+    "saved": "Profile saved",
+    "errors": {
+      "loadFailed": "Failed to load your profile",
+      "saveFailed": "Failed to save your profile",
+      "nameRequired": "First and last name are required"
+    }
+  },
   "header": {
     "brand": "Jadmin",
+    "myProfile": "My Profile",
     "toggleNav": "Toggle navigation",
     "nav": {
       "dashboard": "Dashboard",
@@ -280,6 +298,23 @@
       "filtered": "Try adjusting your search criteria.",
       "default": "Create your first requestor group to get started.",
       "createButton": "Create Group"
+    },
+    "memberFields": {
+      "button": "Member Fields",
+      "title": "Member Fields: {{name}}",
+      "help": "Information your members fill in on their profile beyond the standard contact details. When an agreement requires member information, you map each requirement to one of these fields or a standard one; data holders then receive it when they verify a member's request.",
+      "none": "No custom member fields yet.",
+      "label": "Field name",
+      "labelPlaceholder": "e.g., Blood Type",
+      "type": "Type",
+      "types": { "text": "Text", "number": "Number", "date": "Date", "select": "Choice" },
+      "options": "Choices",
+      "optionsPlaceholder": "Comma-separated, e.g., A+, A-, B+, B-, AB+, AB-, O+, O-",
+      "description": "Help text",
+      "add": "Add Field",
+      "saved": "Member fields saved",
+      "loadFailed": "Failed to load member fields",
+      "saveFailed": "Failed to save member fields"
     },
     "editTitle": "Edit Requestor Group",
     "newTitle": "New Requestor Group",
@@ -585,8 +620,14 @@
         "fieldRequired": "\"{{field}}\" is required.",
         "termsRequired": "You must accept \"{{section}}\" to subscribe.",
         "linkReviewRequired": "You must confirm you have reviewed \"{{field}}\" to subscribe.",
-        "fieldTooLong": "\"{{field}}\" is limited to {{max}} characters."
+        "fieldTooLong": "\"{{field}}\" is limited to {{max}} characters.",
+        "memberFieldUnmapped": "Choose which member field supplies \"{{field}}\"."
       },
+      "memberInformation": "Member Information",
+      "memberInformationHelp": "This agreement requires the information below about each member who makes requests under it. Choose which of your group's member fields supplies each one. Data holders receive it when they verify a member's request, and members without a value cannot use the agreement until they add it to their profile.",
+      "memberFieldPlaceholder": "Choose a member field...",
+      "standardMemberFields": "Standard fields",
+      "customMemberFields": "This group's fields",
       "acceptSection": "I accept this section",
       "selectPlaceholder": "Select...",
       "dataHolderGroupFields": "Data Holder Group Fields",
@@ -738,6 +779,7 @@
       "testingStarted": "Testing started successfully",
       "testsPassed": "All tests passed! You can now activate the subscription.",
       "testsFailed": "Some tests failed. Please review the results.",
+      "testsPending": "Tests ran; member information is still being verified.",
       "activated": "Subscription activated successfully! The agreement is now active.",
       "approved": "\"{{name}}\" has been approved and is ready for testing!",
       "declined": "\"{{name}}\" has been declined: {{reason}}",
@@ -774,6 +816,7 @@
     "result": {
       "passed": "PASSED",
       "failed": "FAILED",
+      "pending": "PENDING",
       "skipped": "SKIPPED",
       "error": "ERROR"
     },
@@ -824,6 +867,12 @@
       "activateSubscription": "Activate Subscription",
       "allTestsPassed": "All Tests Passed!",
       "someTestsFailed": "Some Tests Failed",
+      "testsPending": "Waiting to Verify Member Information",
+      "memberInformation": "Member Information Sent",
+      "memberCheckedFor": "The data holder group verified these details of the member who started the subscription: {{member}}",
+      "memberValueMissing": "Not filled in",
+      "pending": "Pending",
+      "pendingMessage": "Everything else passed. Member information is verified with this subscription's signing key: once its data holder group credentials are entered and its signing key is registered with the group admin, the test runs again automatically and the subscription activates when it passes.",
       "requestId": "Request ID:",
       "testedAt": "Tested At:",
       "validationTests": "Validation Tests",
@@ -851,6 +900,14 @@
       "acknowledgeLink": "I have reviewed this document",
       "reviewFirst": "Accept each section and answer every required field to continue.",
       "selectPlaceholder": "Select..."
+    },
+    "memberInformation": {
+      "title": "Member Information",
+      "help": "Information this agreement requires about each member who makes requests under it, and which of your group's member fields supplies it. Changes take effect on the next request; members without a value cannot use the agreement until they add it to their profile.",
+      "unmapped": "Not mapped — members cannot use this agreement",
+      "save": "Save Mapping",
+      "saved": "Member field mapping saved",
+      "saveFailed": "Failed to save the member field mapping"
     },
     "terms": {
       "title": "Agreement terms — {{name}}",

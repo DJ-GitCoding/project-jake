@@ -207,6 +207,10 @@ public class PendingRequest {
     @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, Object> customParams;
 
+    @Column(name = "requestor_user_fields", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    private Map<String, String> requestorUserFields;
+
     /**
      * When this pending request expires (for polling)
      */

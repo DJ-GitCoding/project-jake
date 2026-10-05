@@ -360,7 +360,7 @@ public class ExternalController {
         try {
             String actor = request != null && request.get("initiatedBy") instanceof String s && !s.isBlank()
                     ? s : "EXTERNAL";
-            report = subscriptionTestService.runTest(requestId, actor);
+            report = subscriptionTestService.runTest(requestId, actor, signedMemberInformation(requestId, request), true);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         } catch (IllegalStateException e) {
@@ -384,6 +384,7 @@ public class ExternalController {
                     tc.put("name", c.getName());
                     tc.put("description", c.getDescription());
                     tc.put("passed", c.isPassed());
+                    tc.put("pending", c.isPending());
                     tc.put("errorMessage", c.getErrorMessage());
                     return tc;
                 })
@@ -396,14 +397,35 @@ public class ExternalController {
         testResult.put("testCases", testCases);
         testResult.put("rdapTestResults", report.getRdapTestResults());
         testResult.put("summary", report.getSummary());
+        testResult.put("memberInformation", report.getMemberInformation());
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("success", true);
         body.put("requestId", requestId);
-        body.put("message", "PASSED".equals(report.getResult()) ? "Tests passed" : "Tests failed");
+        body.put("message", "PASSED".equals(report.getResult()) ? "Tests passed"
+                : "PENDING".equals(report.getResult()) ? "Tests waiting on the requestor manager" : "Tests failed");
         body.put("dataHolderGroupCode", "DH-GROUP-ADMIN");
         body.put("testResult", testResult);
         return ResponseEntity.ok(body);
+    }
+
+    /** The member information a test run carries, only when signed with this subscription's key. */
+    private SubscriptionTestService.MemberTestInput signedMemberInformation(String requestId, Map<String, Object> request) {
+        Object signedFor = httpRequest.getAttribute(HttpSignatureFilter.ATTR_SUBSCRIPTION);
+        if (!requestId.equals(signedFor) || request == null
+                || !(request.get("memberInformation") instanceof Map<?, ?> info)) {
+            return null;
+        }
+        Map<String, String> member = request.get("member") instanceof Map<?, ?> m ? strings(m) : Map.of();
+        return new SubscriptionTestService.MemberTestInput(member, strings(info));
+    }
+
+    private static Map<String, String> strings(Map<?, ?> source) {
+        Map<String, String> values = new LinkedHashMap<>();
+        source.forEach((k, v) -> {
+            if (k != null && v != null) values.put(k.toString(), v.toString());
+        });
+        return values;
     }
 
     /**

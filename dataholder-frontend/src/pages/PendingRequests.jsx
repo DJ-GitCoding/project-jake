@@ -541,6 +541,22 @@ const PendingRequests = () => {
                 </div>
               )}
 
+              {selectedRequest.requestorUserFields && Object.keys(selectedRequest.requestorUserFields).length > 0 && (
+                <div className="col-12">
+                  <div className="text-muted text-uppercase small fw-semibold mb-1">{t('pendingRequests.details.memberInformation')}</div>
+                  <table className="table table-sm mb-0">
+                    <tbody>
+                      {Object.entries(selectedRequest.requestorUserFields).map(([key, value]) => (
+                        <tr key={key}>
+                          <td className="text-muted" style={{ width: '35%' }}>{key.replace(/_/g, ' ')}</td>
+                          <td>{value}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
               {/* Custom Parameters (including file references) */}
               {selectedRequest.customParams && Object.keys(selectedRequest.customParams).length > 0 && (
                 <div className="col-12">

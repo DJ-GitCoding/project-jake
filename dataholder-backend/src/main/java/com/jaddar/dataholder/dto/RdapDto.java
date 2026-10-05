@@ -57,6 +57,8 @@ public class RdapDto {
         /** Custom parameters passed with the RDAP request (file references, extra fields) */
         private Map<String, Object> customParams;
 
+        private Map<String, String> requestorUserFields;
+
         /** File attachments metadata */
         private List<FileAttachmentDto> fileAttachments;
     }

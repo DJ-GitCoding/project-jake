@@ -14,6 +14,7 @@ import com.jaddar.dhgroupadmin.entity.AgreementTemplate;
 import com.jaddar.dhgroupadmin.entity.DataHolderGroup;
 import com.jaddar.dhgroupadmin.entity.RequestTypeCustomParameter;
 import com.jaddar.dhgroupadmin.entity.TemplateSubscriptionField;
+import com.jaddar.dhgroupadmin.entity.TemplateUserField;
 import com.jaddar.dhgroupadmin.entity.Visibility;
 import com.jaddar.dhgroupadmin.repository.AgreementTemplateRepository;
 import lombok.RequiredArgsConstructor;
@@ -115,6 +116,16 @@ public class TemplateCopyService {
                     .minValue(field.getMinValue())
                     .maxValue(field.getMaxValue())
                     .maxLength(field.getMaxLength())
+                    .sortOrder(field.getSortOrder())
+                    .build());
+        }
+
+        for (TemplateUserField field : source.getUserFields()) {
+            copy.addUserField(TemplateUserField.builder()
+                    .key(field.getKey())
+                    .label(field.getLabel())
+                    .description(field.getDescription())
+                    .standard(field.getStandard())
                     .sortOrder(field.getSortOrder())
                     .build());
         }

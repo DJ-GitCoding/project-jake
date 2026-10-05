@@ -210,6 +210,10 @@ public class SubscriptionRequest {
     @Column(name = "pending_template_snapshot", columnDefinition = "jsonb")
     private Map<String, Object> pendingTemplateSnapshot;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "user_field_mapping", columnDefinition = "jsonb")
+    private Map<String, String> userFieldMapping;
+
     /** Ids of the legal sections the requestor accepted when subscribing. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "accepted_legal_section_ids", columnDefinition = "jsonb")

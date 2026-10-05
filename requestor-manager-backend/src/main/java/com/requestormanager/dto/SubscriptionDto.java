@@ -102,6 +102,10 @@ public class SubscriptionDto {
         @Schema(description = "Ids of the legal sections the requestor accepted")
         private java.util.List<Long> acceptedLegalSectionIds;
 
+        @Schema(description = "Which group member field answers each member field the template requires: "
+                + "template field key to std:<key> or custom:<field id>")
+        private java.util.Map<String, String> userFieldMapping;
+
         @Schema(description = "Submit immediately after creation (default: false)")
         private Boolean submitImmediately = false;
     }
@@ -257,6 +261,9 @@ public class SubscriptionDto {
         @Schema(description = "The terms this subscription runs under")
         private java.util.Map<String, Object> templateSnapshot;
 
+        @Schema(description = "Which group member field answers each member field the template requires")
+        private java.util.Map<String, String> userFieldMapping;
+
         @Schema(description = "Agreement id issued by the data holder, once active")
         private String agreementId;
 
@@ -318,6 +325,8 @@ public class SubscriptionDto {
                     inferredTestResult = "PASSED";
                 } else if (msg.startsWith("Testing: FAILED")) {
                     inferredTestResult = "FAILED";
+                } else if (msg.startsWith("Testing: PENDING")) {
+                    inferredTestResult = "PENDING";
                 }
             }
             return fromEntity(entity, inferredTestResult);
@@ -359,6 +368,10 @@ public class SubscriptionDto {
                     if ("PASSED".equalsIgnoreCase(testResultFromDh)) {
                         actions.add("activate");
                         hint = "Tests passed. Activate the subscription to make it live.";
+                    } else if ("PENDING".equalsIgnoreCase(testResultFromDh)) {
+                        hint = "Everything else passed. Member information is verified once this subscription's "
+                                + "credentials are exchanged and its signing key is registered; the test then runs "
+                                + "again automatically.";
                     } else {
                         hint = "Run tests to validate the agreement. Activate becomes available after tests pass.";
                     }
@@ -407,6 +420,7 @@ public class SubscriptionDto {
                     .pendingChangeDeadline(entity.getPendingChangeDeadline())
                     .pendingTemplateSnapshot(entity.getPendingTemplateSnapshot())
                     .templateSnapshot(entity.getTemplateSnapshot())
+                    .userFieldMapping(entity.getUserFieldMapping())
                     .agreementId(entity.getDataHolderAgreement() != null
                             ? entity.getDataHolderAgreement().getExternalAgreementId() : null)
                     .acceptedTerms(entity.getAcceptedTerms())
@@ -647,6 +661,9 @@ public class SubscriptionDto {
 
         @Schema(description = "Summary counts for quick UI display")
         private TestSummaryResult summary;
+
+        @Schema(description = "The member information the member check received: member, and each required field's value")
+        private java.util.Map<String, Object> memberInformation;
     }
 
     /**
@@ -668,6 +685,9 @@ public class SubscriptionDto {
 
         @Schema(description = "Whether the test passed")
         private Boolean passed;
+
+        @Schema(description = "Not failed, but waiting on the requestor manager")
+        private Boolean pending;
 
         @Schema(description = "Error message if failed")
         private String errorMessage;

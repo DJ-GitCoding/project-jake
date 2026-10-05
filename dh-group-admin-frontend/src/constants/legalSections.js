@@ -102,6 +102,19 @@ export const STANDARD_LEGAL_SECTIONS = [
     ],
   },
   {
+    key: 'authentication-quality-standards',
+    title: 'Authentication Service Quality Standards',
+    clauses: [
+      { text: 'The Requestor Agent shall operate, or procure, the authentication service through which Requestors are identified when invoking this Agreement, including the token introspection service the Data Holder relies on to verify each Requestor at the time of a request.' },
+      { text: 'The Requestor Agent shall verify the identity of each Requestor before registering that Requestor as a member of the Requestor Group, to a level of assurance appropriate to the data that may be disclosed under this Agreement, and shall keep a record of how each identity was verified.' },
+      { text: 'Requestor credentials shall be protected by multi-factor authentication, shall be issued to and used by a single natural person only, and shall be revoked without undue delay when a Requestor leaves the Requestor Group or no longer meets the conditions of membership.' },
+      { text: 'The member information the authentication service supplies to the Data Holder shall be accurate and kept up to date by the Requestor Agent, and shall be limited to the information this Agreement requires.' },
+      { text: 'Access tokens issued by the authentication service shall be short-lived, and the token introspection service shall be available to the Data Holder with a level of availability that allows requests under this Agreement to be verified when they are made.' },
+      { text: 'The Requestor Agent shall notify the Data Holder, via the means of contact stipulated in this Agreement, without undue delay and in any event within [specified period] of becoming aware of any security incident affecting the authentication service or the credentials of any Requestor.' },
+      { text: 'The Requestor Agent shall keep logs of authentication and token introspection events for at least [specified retention period] and make them available to the Data Holder on reasonable request in connection with a suspected breach of this Agreement.' },
+    ],
+  },
+  {
     key: 'requestor-group-specific-provisions',
     title: 'Requestor Group specific Provisions',
     clauses: [

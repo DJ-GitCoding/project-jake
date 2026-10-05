@@ -150,7 +150,10 @@ const RequestTypeSelector = ({
     return agreement.requestTypes && agreement.requestTypes.length > 1;
   };
 
-  const isUsable = (agreement) => agreement?.hasCredentials !== false;
+  const hasCredentials = (agreement) => agreement?.hasCredentials !== false;
+  /** Member information the agreement requires that this member has not filled in. */
+  const missingFields = (agreement) => agreement?.missingUserFields || [];
+  const isUsable = (agreement) => hasCredentials(agreement) && missingFields(agreement).length === 0;
 
   const selectAgreement = (agreement, requestType = null) => {
     if (!isUsable(agreement)) return;
@@ -177,6 +180,7 @@ const RequestTypeSelector = ({
 
   const selectRequestType = (e, agreement, requestType) => {
     e.stopPropagation();
+    if (!isUsable(agreement)) return;
     onChange({
       agreement,
       requestType,
@@ -434,7 +438,11 @@ const RequestTypeSelector = ({
                         opacity: usable ? 1 : 0.65,
                       }}
                       aria-disabled={!usable}
-                      title={usable ? undefined : 'Credentials for this subscription have not been received from the data holder group, so it cannot be queried yet.'}
+                      title={usable ? undefined : !hasCredentials(agreement)
+                        ? 'Credentials for this subscription have not been received from the data holder group, so it cannot be queried yet.'
+                        : t('requestTypeSelector.missingProfileTitle', {
+                            fields: missingFields(agreement).map(f => f.label).join(', '),
+                          })}
                       onClick={(e) => { e.stopPropagation(); selectAgreement(agreement); }}
                     >
                       <div className="flex-grow-1">
@@ -453,13 +461,26 @@ const RequestTypeSelector = ({
                               {agreement.requestorGroupCode}
                             </span>
                           )}
-                          {!usable && (
+                          {!hasCredentials(agreement) && (
                             <span className="badge bg-warning text-dark ms-2" style={{ fontSize: '10px' }}>
                               <i className="bi bi-key-fill me-1"></i>
                               No credentials
                             </span>
                           )}
+                          {hasCredentials(agreement) && missingFields(agreement).length > 0 && (
+                            <span className="badge bg-warning text-dark ms-2" style={{ fontSize: '10px' }}>
+                              <i className="bi bi-person-exclamation me-1"></i>
+                              {t('requestTypeSelector.missingProfileBadge')}
+                            </span>
+                          )}
                         </div>
+                        {hasCredentials(agreement) && missingFields(agreement).length > 0 && (
+                          <small className="text-danger d-block" style={{ marginLeft: multipleTypes ? '1.25rem' : '0' }}>
+                            {t('requestTypeSelector.missingProfile', {
+                              fields: missingFields(agreement).map(f => f.label).join(', '),
+                            })}
+                          </small>
+                        )}
                         {agreement.description && (
                           <small className="text-muted d-block" style={{ marginLeft: multipleTypes ? '1.25rem' : agrSelected ? '1.5rem' : '0' }}>
                             {agreement.description}

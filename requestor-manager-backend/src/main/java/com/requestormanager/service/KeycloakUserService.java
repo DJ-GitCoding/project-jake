@@ -381,6 +381,34 @@ public class KeycloakUserService {
         return response;
     }
 
+    public record Identity(String id, String username, String firstName, String lastName, String email) {}
+
+    /** Look up a member's identity without a signed-in caller, for answering token introspection. */
+    public Identity lookupIdentity(String userId) {
+        Map<String, Object> user = fetchUserById(getAdminToken(), userId);
+        if (user == null) return null;
+        return new Identity(userId, (String) user.get("username"), (String) user.get("firstName"),
+                (String) user.get("lastName"), (String) user.get("email"));
+    }
+
+    /** Change the signed-in member's own name. */
+    public void updateOwnName(String userId, String firstName, String lastName) {
+        String adminToken = getAdminToken();
+        Map<String, Object> existing = fetchUserById(adminToken, userId);
+        if (existing == null) {
+            throw new ResourceNotFoundException("User", "id", userId);
+        }
+        existing.put("firstName", firstName);
+        existing.put("lastName", lastName);
+        try {
+            restTemplate.put(keycloakAdminUrl + "/users/" + userId,
+                    new HttpEntity<>(existing, createAuthHeaders(adminToken)));
+        } catch (HttpClientErrorException e) {
+            log.error("Failed to update own name in Keycloak: {}", e.getResponseBodyAsString(), e);
+            throw new BadRequestException("Unable to update your name. Please try again.");
+        }
+    }
+
     /**
      * Get current user info
      */

@@ -30,6 +30,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -47,6 +48,12 @@ public class SubscriptionService {
     private final DataHolderGroupRepository dataHolderGroupRepository;
     private final DataHolderGroupClientService dataHolderGroupClientService;
     private final SubscriptionCredentialService credentialService;
+    private final RequestorUserFieldService userFieldService;
+    private final KeycloakUserService keycloakUserService;
+    private final org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+    private final Map<Long, LocalDateTime> pendingTestRetries = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final long PENDING_TEST_RETRY_MINUTES = 5;
     private final SecurityUtils securityUtils;
 
     @Value("${requestor-manager.callback.base-url:http://localhost:8081}")
@@ -110,6 +117,7 @@ public class SubscriptionService {
                 .templateName(request.getTemplateName())
                 .subscriptionFieldValues(request.getSubscriptionFieldValues())
                 .acceptedLegalSectionIds(request.getAcceptedLegalSectionIds())
+                .userFieldMapping(cleanUserFieldMapping(request.getUserFieldMapping(), requestorGroup.getId()))
                 // Contact info
                 .requestorFirstName(request.getRequestorFirstName())
                 .requestorLastName(request.getRequestorLastName())
@@ -372,7 +380,8 @@ public class SubscriptionService {
         // Call dataholdergroup to run tests
         DataHolderGroupDto.TestExecutionResponse response = dataHolderGroupClientService.runTest(
                 subscriptionRequest.getDataHolderGroup().getId(),
-                subscriptionRequest.getExternalRequestId());
+                subscriptionRequest.getExternalRequestId(),
+                prepareMemberTest(subscriptionRequest));
 
         if (response.getSuccess() && response.getTestResult() != null) {
             DataHolderGroupDto.TestResultInfo tr = response.getTestResult();
@@ -395,6 +404,7 @@ public class SubscriptionService {
                                 .name(tc.getName())
                                 .description(tc.getDescription())
                                 .passed(tc.getPassed())
+                                .pending(tc.getPending())
                                 .errorMessage(tc.getErrorMessage())
                                 .build())
                         .collect(Collectors.toList());
@@ -434,6 +444,7 @@ public class SubscriptionService {
                     .testCases(testCases)
                     .rdapTestResults(rdapTestResults)
                     .summary(summary)
+                    .memberInformation(tr.getMemberInformation())
                     .build();
         } else {
             log.warn("Failed to run tests for subscription {}: {}", 
@@ -650,6 +661,8 @@ public class SubscriptionService {
                     log.info("Auto-advance: {} TESTING → running tests",
                             subscriptionRequest.getInternalRequestId());
                     runTestInternal(subscriptionRequest);
+                } else if ("PENDING".equals(testResult)) {
+                    retryPendingTest(subscriptionRequest);
                 } else if ("PASSED".equals(testResult)) {
                     log.info("Auto-advance: {} tests PASSED → activating",
                             subscriptionRequest.getInternalRequestId());
@@ -668,6 +681,61 @@ public class SubscriptionService {
             default -> {
                 // SUBMITTED / PENDING_REVIEW (awaiting approval) or a terminal state — nothing to do.
             }
+        }
+    }
+
+    /** Retry a pending test while the subscription can sign, at most every few minutes. */
+    private void retryPendingTest(SubscriptionRequest sr) {
+        boolean hasCredentials = sr.getDhgClientId() != null && !sr.getDhgClientId().isBlank()
+                && sr.getDhgClientSecret() != null && !sr.getDhgClientSecret().isBlank();
+        boolean hasSigningKey = sr.getDhgPrivateKey() != null && !sr.getDhgPrivateKey().isBlank();
+        if (!hasCredentials || !hasSigningKey) {
+            String missing = !hasCredentials && !hasSigningKey
+                    ? "no data holder group credentials have been entered and no signing key has been generated"
+                    : !hasCredentials ? "no data holder group credentials have been entered"
+                    : "no signing key has been generated";
+            String waiting = "Testing: PENDING — member information cannot be verified yet: " + missing
+                    + " for this subscription. The test runs again automatically once that is done.";
+            if (!waiting.equals(sr.getStatusMessage())) {
+                sr.setStatusMessage(waiting);
+                subscriptionRequestRepository.save(sr);
+            }
+            return;
+        }
+        LocalDateTime last = pendingTestRetries.get(sr.getId());
+        if (last != null && last.isAfter(LocalDateTime.now().minusMinutes(PENDING_TEST_RETRY_MINUTES))) return;
+        pendingTestRetries.put(sr.getId(), LocalDateTime.now());
+        log.info("Auto-advance: {} test PENDING → running it again with signed member information",
+                sr.getInternalRequestId());
+        runTestInternal(sr);
+    }
+
+    /** Run a subscription's test again once its credentials have been exchanged. */
+    private void rerunTestAfterCommit(SubscriptionRequest subscription) {
+        if (subscription.getStatus() != SubscriptionStatus.TESTING) return;
+        Long id = subscription.getId();
+        pendingTestRetries.remove(id);
+        Runnable rerun = () -> {
+            try {
+                var tx = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+                tx.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                tx.executeWithoutResult(status -> subscriptionRequestRepository.findById(id)
+                        .filter(sr -> sr.getStatus() == SubscriptionStatus.TESTING)
+                        .ifPresent(this::runTestInternal));
+            } catch (Exception e) {
+                log.warn("Could not re-run the test for subscription {} after its credentials changed: {}",
+                        subscription.getInternalRequestId(), e.getMessage());
+            }
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    rerun.run();
+                }
+            });
+        } else {
+            rerun.run();
         }
     }
 
@@ -809,10 +877,42 @@ public class SubscriptionService {
             subscription.setDhgPrivateKey(keys.privateKeyBase64());
             subscriptionRequestRepository.save(subscription);
             log.info("Generated signing keys for subscription {}", subscription.getInternalRequestId());
+            rerunTestAfterCommit(subscription);
             return keys.publicKeyBase64();
         } catch (Exception e) {
             throw new IllegalStateException("Could not generate signing keys: " + e.getMessage(), e);
         }
+    }
+
+    /** Change which of the group's member fields answers each member field the agreement requires. */
+    @Transactional
+    public SubscriptionRequestResponse updateUserFieldMapping(Long id, Map<String, String> mapping) {
+        KeycloakUser currentUser = securityUtils.requireCurrentUser();
+        SubscriptionRequest subscription = subscriptionRequestRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("SubscriptionRequest", "id", id));
+        validateGroupAccess(currentUser, subscription.getRequestorGroup());
+        if (!currentUser.getUserType().canManageGroupContent()) {
+            throw new AccessDeniedException("Only group admins can change how member fields are mapped");
+        }
+        subscription.setUserFieldMapping(cleanUserFieldMapping(mapping, subscription.getRequestorGroup().getId()));
+        subscription = subscriptionRequestRepository.save(subscription);
+        log.info("Member field mapping updated for subscription {} by {}",
+                subscription.getInternalRequestId(), currentUser.getEmail());
+        return SubscriptionRequestResponse.fromEntity(subscription);
+    }
+
+    /** Keep only entries that name a member field the requestor group actually has. */
+    private Map<String, String> cleanUserFieldMapping(Map<String, String> mapping, Long requestorGroupId) {
+        if (mapping == null) return null;
+        Map<String, String> clean = new LinkedHashMap<>();
+        mapping.forEach((templateKey, ref) -> {
+            if (templateKey == null || templateKey.isBlank() || ref == null || ref.isBlank()) return;
+            if (!userFieldService.isValidReference(ref.trim(), requestorGroupId)) {
+                throw new BadRequestException("'" + ref + "' is not a member field of this requestor group.");
+            }
+            clean.put(templateKey.trim(), ref.trim());
+        });
+        return clean;
     }
 
     @Transactional
@@ -829,6 +929,7 @@ public class SubscriptionService {
         subscriptionRequestRepository.save(subscription);
         log.info("Stored data holder group credentials for subscription {}", subscription.getInternalRequestId());
         repairIntrospectionAfterCommit(subscription);
+        rerunTestAfterCommit(subscription);
     }
 
     /**
@@ -1013,6 +1114,37 @@ public class SubscriptionService {
     }
 
     // ==================== Helper Methods ====================
+
+    /** The starting member's identity and values for the fields the agreement requires. */
+    private DataHolderGroupClientService.MemberTest prepareMemberTest(SubscriptionRequest sr) {
+        if (sr.getTemplateSnapshot() == null) {
+            dataHolderGroupClientService.getAgreementStatus(sr.getDataHolderGroup().getId(), sr.getExternalRequestId())
+                    .map(DataHolderGroupDto.StatusResponse::getTemplateSnapshot)
+                    .ifPresent(sr::setTemplateSnapshot);
+        }
+        if (userFieldService.requiredFields(sr).isEmpty()) return null;
+        String memberId = sr.getCreatedByKeycloakId();
+        if (memberId == null) {
+            log.warn("Subscription {} has no recorded creator, so its member information cannot be tested",
+                    sr.getInternalRequestId());
+            return new DataHolderGroupClientService.MemberTest(Map.of(), Map.of());
+        }
+        KeycloakUserService.Identity member = keycloakUserService.lookupIdentity(memberId);
+        Map<String, String> values = userFieldService.memberValues(memberId,
+                member != null ? member.firstName() : null,
+                member != null ? member.lastName() : null,
+                member != null ? member.email() : sr.getCreatedByEmail());
+
+        Map<String, String> who = new LinkedHashMap<>();
+        String name = member != null
+                ? String.join(" ", java.util.stream.Stream.of(member.firstName(), member.lastName())
+                        .filter(s -> s != null && !s.isBlank()).toList())
+                : sr.getCreatedByName();
+        if (name != null && !name.isBlank()) who.put("name", name);
+        String email = member != null && member.email() != null ? member.email() : sr.getCreatedByEmail();
+        if (email != null) who.put("email", email);
+        return new DataHolderGroupClientService.MemberTest(who, userFieldService.memberFields(sr, values).values());
+    }
 
     /**
      * Refresh the template-change state of one active subscription from the group admin. Active

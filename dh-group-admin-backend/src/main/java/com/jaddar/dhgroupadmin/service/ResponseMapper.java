@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -44,6 +45,7 @@ public class ResponseMapper {
         r.put("requiredGroupTypes", template.getRequiredGroupTypes());
         r.put("legalSections", template.getLegalSections().stream().map(this::toLegalSectionMap).toList());
         r.put("subscriptionFields", template.getSubscriptionFields().stream().map(this::toSubscriptionFieldMap).toList());
+        r.put("userFields", template.getUserFields().stream().map(this::toUserFieldMap).toList());
         r.put("disclosureMode", template.getDisclosureMode());
         r.put("maxQueriesPerDay", template.getMaxQueriesPerDay());
         r.put("maxQueriesPerMonth", template.getMaxQueriesPerMonth());
@@ -181,6 +183,7 @@ public class ResponseMapper {
         snap.put("capturedAt", java.time.LocalDateTime.now().toString());
         snap.put("legalSections", t.getLegalSections().stream().map(this::toLegalSectionMap).toList());
         snap.put("subscriptionFields", t.getSubscriptionFields().stream().map(this::toSubscriptionFieldMap).toList());
+        snap.put("userFields", t.getUserFields().stream().map(this::toUserFieldMap).toList());
         snap.put("requestTypes", t.getRequestTypes().stream().map(this::toRequestTypeResponse).toList());
         return snap;
     }
@@ -193,6 +196,17 @@ public class ResponseMapper {
         m.put("body", s.getBody());
         m.put("clauses", s.getClauses());
         m.put("sortOrder", s.getSortOrder());
+        return m;
+    }
+
+    /** A required member field. */
+    public Map<String, Object> toUserFieldMap(TemplateUserField f) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("key", f.getKey());
+        m.put("label", f.getLabel());
+        m.put("description", f.getDescription());
+        m.put("standard", Boolean.TRUE.equals(f.getStandard()));
+        m.put("sortOrder", f.getSortOrder());
         return m;
     }
 
@@ -339,6 +353,7 @@ public class ResponseMapper {
             r.put("requestTypes", snap.get("requestTypes"));
             r.put("legalSections", snap.get("legalSections"));
             r.put("subscriptionFields", snap.get("subscriptionFields"));
+            r.put("userFields", snap.getOrDefault("userFields", List.of()));
         } else if (s.getTemplate() != null) {
             r.put("requestTypes", s.getTemplate().getRequestTypes().stream()
                     .map(this::toRequestTypeResponse).toList());
@@ -346,6 +361,8 @@ public class ResponseMapper {
                     .map(this::toLegalSectionMap).toList());
             r.put("subscriptionFields", s.getTemplate().getSubscriptionFields().stream()
                     .map(this::toSubscriptionFieldMap).toList());
+            r.put("userFields", s.getTemplate().getUserFields().stream()
+                    .map(this::toUserFieldMap).toList());
         }
         return r;
     }

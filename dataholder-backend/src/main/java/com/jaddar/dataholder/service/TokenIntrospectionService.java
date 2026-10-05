@@ -21,6 +21,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -154,6 +155,12 @@ public class TokenIntrospectionService {
      * @return the outcome, carrying the resolved identity when active
      */
     public SubscriptionIntrospection introspectForSubscription(String token, String requestorGroupCode) {
+        return introspectForSubscription(token, requestorGroupCode, null);
+    }
+
+    /** Introspect, preferring the subscription that offers the request type. */
+    public SubscriptionIntrospection introspectForSubscription(String token, String requestorGroupCode,
+                                                               String requestTypeCode) {
         if (token == null || token.isBlank()) {
             return SubscriptionIntrospection.failure(Outcome.TOKEN_REJECTED);
         }
@@ -166,14 +173,19 @@ public class TokenIntrospectionService {
         int subscriptionCount = 0;
 
         // Subscriptions belong to the data holder group; data holder keeps none of its own.
-        for (Map<String, Object> sub : groupAdminSubscriptions(requestorGroupCode)) {
+        List<Map<String, Object>> subscriptions = new ArrayList<>(groupAdminSubscriptions(requestorGroupCode));
+        if (requestTypeCode != null && !requestTypeCode.isBlank()) {
+            subscriptions.sort(Comparator.comparing(sub -> !offersRequestType(sub, requestTypeCode)));
+        }
+        for (Map<String, Object> sub : subscriptions) {
             subscriptionCount++;
             addEndpoints(endpoints, registeredUrls,
                     str(sub.get("introspectionUrl")),
                     str(sub.get("requestorGroupCode")),
                     str(sub.get("requestorGroupName")),
                     new Credential(str(sub.get("introspectionClientId")),
-                                   str(sub.get("introspectionClientSecret"))));
+                                   str(sub.get("introspectionClientSecret"))),
+                    sub);
         }
 
         if (subscriptionCount == 0) {
@@ -207,7 +219,9 @@ public class TokenIntrospectionService {
             }
 
             log.debug("Introspection succeeded for group {} via client '{}'", groupLabel, endpoint.clientId());
-            return new SubscriptionIntrospection(Outcome.ACTIVE, toTokenInfo(result));
+            TokenInfo info = toTokenInfo(result);
+            applyMemberFields(info, result, endpoint.subscription());
+            return new SubscriptionIntrospection(Outcome.ACTIVE, info);
         }
 
         log.warn("Introspection: token was not accepted by any of the {} introspection endpoint(s) " +
@@ -243,6 +257,42 @@ public class TokenIntrospectionService {
     public TokenInfo introspectToken(String token) {
         SubscriptionIntrospection introspection = introspectForSubscription(token, null);
         return introspection.isActive() ? introspection.tokenInfo() : null;
+    }
+
+    public static final String USER_FIELDS_CLAIM = "user_fields";
+
+    /** Record the member information supplied and the required fields the member lacks. */
+    @SuppressWarnings("unchecked")
+    private void applyMemberFields(TokenInfo info, IntrospectionResult result, Map<String, Object> subscription) {
+        Map<String, String> supplied = new LinkedHashMap<>();
+        if (result.claims().get(USER_FIELDS_CLAIM) instanceof Map<?, ?> fields) {
+            fields.forEach((k, v) -> {
+                if (k != null && v != null && !v.toString().isBlank()) supplied.put(k.toString(), v.toString());
+            });
+        }
+        List<Map<String, String>> missing = new ArrayList<>();
+        if (subscription != null && subscription.get("userFields") instanceof List<?> required) {
+            for (Object o : required) {
+                if (!(o instanceof Map<?, ?> field) || !(field.get("key") instanceof String key)) continue;
+                if (!supplied.containsKey(key)) {
+                    String label = field.get("label") instanceof String l && !l.isBlank() ? l : key;
+                    missing.add(Map.of("key", key, "label", label));
+                }
+            }
+        }
+        info.setUserFields(supplied);
+        info.setMissingUserFields(missing);
+    }
+
+    private static boolean offersRequestType(Map<String, Object> subscription, String requestTypeCode) {
+        if (!(subscription.get("requestTypes") instanceof List<?> types)) return false;
+        for (Object o : types) {
+            if (o instanceof Map<?, ?> rt && rt.get("typeCode") != null
+                    && rt.get("typeCode").toString().equalsIgnoreCase(requestTypeCode)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // ==================== Requestor group joining links ====================
@@ -288,7 +338,7 @@ public class TokenIntrospectionService {
                 String url = str(sub.get("introspectionUrl"));
                 if (Endpoint.notBlank(url) && credential.isComplete()) {
                     addEndpoint(endpoints, new Endpoint(url, credential.clientId(), credential.clientSecret(),
-                            str(sub.get("requestorGroupCode")), str(sub.get("requestorGroupName"))));
+                            str(sub.get("requestorGroupCode")), str(sub.get("requestorGroupName")), sub));
                 }
             }
         }
@@ -370,7 +420,7 @@ public class TokenIntrospectionService {
      * accepted for it.
      */
     private record Endpoint(String url, String clientId, String clientSecret,
-                            String groupCode, String groupName) {
+                            String groupCode, String groupName, Map<String, Object> subscription) {
 
         /** Identity of the endpoint for de-duplication: same URL and same client. */
         String key() {
@@ -396,13 +446,14 @@ public class TokenIntrospectionService {
      * to the Group Admin, which serves them back on the subscription record.
      */
     private void addEndpoints(Map<String, Endpoint> endpoints, Set<String> registeredUrls, String url,
-                              String groupCode, String groupName, Credential credential) {
+                              String groupCode, String groupName, Credential credential,
+                              Map<String, Object> subscription) {
         if (!Endpoint.notBlank(url)) return;
         registeredUrls.add(url);
 
         if (credential.isComplete()) {
             addEndpoint(endpoints, new Endpoint(url, credential.clientId(),
-                    credential.clientSecret(), groupCode, groupName));
+                    credential.clientSecret(), groupCode, groupName, subscription));
         }
     }
 

@@ -205,6 +205,10 @@ public class ExternalApiDto {
 
         @Schema(description = "True when credentials for this subscription are held", example = "true")
         private Boolean hasCredentials;
+
+        @Schema(description = "Member information this agreement requires that the signed-in member does not "
+                + "have, as {key, label}. The agreement cannot be used until this is empty.")
+        private List<java.util.Map<String, String>> missingUserFields;
     }
 
     @Getter

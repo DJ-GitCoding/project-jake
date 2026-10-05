@@ -577,6 +577,9 @@ public class DataHolderGroupDto {
 
         @Schema(description = "Summary counts for quick UI display")
         private TestSummaryInfo summary;
+
+        @Schema(description = "The member information the member check received: member, and each required field's value")
+        private java.util.Map<String, Object> memberInformation;
     }
 
     @Getter
@@ -595,6 +598,9 @@ public class DataHolderGroupDto {
 
         @Schema(description = "Whether the test passed")
         private Boolean passed;
+
+        @Schema(description = "Not failed, but waiting on the requestor manager")
+        private Boolean pending;
 
         @Schema(description = "Error message if failed")
         private String errorMessage;

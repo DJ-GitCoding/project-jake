@@ -14,6 +14,7 @@ import Modal from './Modal';
 import Pagination from './Pagination';
 import CountrySelect from './CountrySelect';
 import { buildReferenceIndex, sectionClauseLines } from '../constants/legalSections';
+import { initialMemberFieldMapping, MemberFieldSelect } from '../constants/memberFields';
 import DataHolderContact from './DataHolderContact';
 import { useT } from '../i18n';
 
@@ -63,6 +64,7 @@ const SubscribeFlow = ({ show, dataHolderGroup, onHide, onSubscribed }) => {
   });
 
   const [submitting, setSubmitting] = useState(false);
+  const [groupMemberFields, setGroupMemberFields] = useState([]);
 
   /*
    * This deployment's token-introspection endpoint. Groups created before the field existed
@@ -176,10 +178,35 @@ const SubscribeFlow = ({ show, dataHolderGroup, onHide, onSubscribed }) => {
         ])
       ),
       acceptedLegalSectionIds: [],
+      userFieldMapping: initialMemberFieldMapping(template.userFields, []),
     });
 
     setShowSubscribeModal(true);
   };
+
+  useEffect(() => {
+    const groupId = subscriptionFormData.requestorGroupId;
+    if (!showSubscribeModal || !groupId || !(selectedTemplate?.userFields || []).length) {
+      setGroupMemberFields([]);
+      return;
+    }
+    let cancelled = false;
+    requestorGroupsApi.getUserFields(groupId)
+      .then((res) => {
+        if (cancelled) return;
+        const fields = res.data.data || [];
+        setGroupMemberFields(fields);
+        setSubscriptionFormData((prev) => {
+          const defaults = initialMemberFieldMapping(selectedTemplate.userFields, fields);
+          const merged = { ...defaults };
+          Object.entries(prev.userFieldMapping || {}).forEach(([k, v]) => { if (v) merged[k] = v; });
+          return { ...prev, userFieldMapping: merged };
+        });
+      })
+      .catch((err) => console.error('Failed to load member fields:', err));
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSubscribeModal, subscriptionFormData.requestorGroupId, selectedTemplate]);
 
   const closeTemplates = () => {
     setShowTemplatesModal(false);
@@ -207,6 +234,7 @@ const SubscribeFlow = ({ show, dataHolderGroup, onHide, onSubscribed }) => {
       submitImmediately: true,
       subscriptionFieldValues: {},
       acceptedLegalSectionIds: [],
+      userFieldMapping: {},
     });
   };
 
@@ -273,6 +301,12 @@ const SubscribeFlow = ({ show, dataHolderGroup, onHide, onSubscribed }) => {
     const unaccepted = (selectedTemplate?.legalSections || []).find(sec => !accepted.includes(sec.id));
     if (unaccepted) {
       showError(t('dataHolderGroups.subscribe.validation.termsRequired', { section: unaccepted.title }));
+      return;
+    }
+
+    const unmapped = (selectedTemplate?.userFields || []).find(f => !subscriptionFormData.userFieldMapping?.[f.key]);
+    if (unmapped) {
+      showError(t('dataHolderGroups.subscribe.validation.memberFieldUnmapped', { field: unmapped.label }));
       return;
     }
 
@@ -1029,6 +1063,44 @@ const SubscribeFlow = ({ show, dataHolderGroup, onHide, onSubscribed }) => {
                         </div>
                       );
                     })}
+                  </div>
+                </div>
+              )}
+
+              {(selectedTemplate?.userFields || []).length > 0 && (
+                <div className="card mb-4">
+                  <div className="card-header">
+                    <h6 className="mb-0">
+                      <i className="fas fa-id-card me-2"></i>
+                      {t('dataHolderGroups.subscribe.memberInformation')}
+                    </h6>
+                  </div>
+                  <div className="card-body">
+                    <p className="small text-muted">{t('dataHolderGroups.subscribe.memberInformationHelp')}</p>
+                    {selectedTemplate.userFields.map((f) => (
+                      <div className="row g-2 align-items-center mb-2" key={f.key}>
+                        <div className="col-md-5">
+                          <label htmlFor={`uf-${f.key}`} className="form-label mb-0">
+                            {f.label} <span className="text-danger">*</span>
+                          </label>
+                          {f.description && <div className="small text-muted">{f.description}</div>}
+                        </div>
+                        <div className="col-md-7">
+                          <MemberFieldSelect
+                            id={`uf-${f.key}`}
+                            value={subscriptionFormData.userFieldMapping?.[f.key]}
+                            groupFields={groupMemberFields}
+                            placeholder={t('dataHolderGroups.subscribe.memberFieldPlaceholder')}
+                            standardLabel={t('dataHolderGroups.subscribe.standardMemberFields')}
+                            customLabel={t('dataHolderGroups.subscribe.customMemberFields')}
+                            onChange={(v) => setSubscriptionFormData({
+                              ...subscriptionFormData,
+                              userFieldMapping: { ...subscriptionFormData.userFieldMapping, [f.key]: v },
+                            })}
+                          />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

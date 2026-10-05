@@ -642,6 +642,9 @@ public class PendingRequestService {
         }
 
         // Map custom parameters (file references, etc.)
+        if (request.getRequestorUserFields() != null && !request.getRequestorUserFields().isEmpty()) {
+            dto.setRequestorUserFields(request.getRequestorUserFields());
+        }
         if (request.getCustomParams() != null && !request.getCustomParams().isEmpty()) {
             dto.setCustomParams(request.getCustomParams());
         }

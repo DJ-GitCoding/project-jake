@@ -70,20 +70,21 @@ export const AlertProvider = ({ children }) => {
         position: 'top-right',
       };
 
+      let toastId;
       switch (type) {
         case 'success':
-          toast.success(message, toastOptions);
+          toastId = toast.success(message, toastOptions);
           break;
         case 'error':
-          toast.error(message, toastOptions);
+          toastId = toast.error(message, toastOptions);
           break;
         default:
-          toast(message, {
+          toastId = toast(message, {
             ...toastOptions,
             icon: type === 'warning' ? '⚠️' : 'ℹ️',
           });
       }
-      return null;
+      return `toast:${toastId}`;
     }
 
     // Modal alert
@@ -181,6 +182,10 @@ export const AlertProvider = ({ children }) => {
    * Dismiss an alert by ID
    */
   const dismissAlert = useCallback((id) => {
+    if (typeof id === 'string' && id.startsWith('toast:')) {
+      toast.dismiss(id.slice('toast:'.length));
+      return;
+    }
     setAlerts(prev => prev.filter(alert => alert.id !== id));
   }, []);
 

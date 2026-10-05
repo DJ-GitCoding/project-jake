@@ -119,6 +119,21 @@ export const requestorGroupsApi = {
 
   delete: (id) =>
     api.delete(`/api/v1/requestor-groups/${id}`),
+
+  /** Custom member fields the group asks its members to fill in. */
+  getUserFields: (id) =>
+    api.get(`/api/v1/requestor-groups/${id}/user-fields`),
+
+  updateUserFields: (id, fields) =>
+    api.put(`/api/v1/requestor-groups/${id}/user-fields`, fields),
+};
+
+export const profileApi = {
+  get: () =>
+    api.get('/api/v1/profile'),
+
+  update: (data) =>
+    api.put('/api/v1/profile', data),
 };
 
 // ==================== Agreements API ====================
@@ -213,6 +228,10 @@ export const dataHolderGroupsApi = {
 
 // ==================== Subscriptions API ====================
 export const subscriptionsApi = {
+  /** Which group member field answers each member field the agreement requires. */
+  updateUserFieldMapping: (id, mapping) =>
+    api.put(`/api/v1/subscriptions/${id}/user-field-mapping`, mapping),
+
   /*
    * Subscription Requests
    * Pass { page, size, search, status, requestorGroupId, sortBy, sortDir } for a

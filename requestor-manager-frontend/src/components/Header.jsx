@@ -22,6 +22,7 @@ const Header = () => {
   const location = useLocation();
   const { t } = useT();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const [menuHeight, setMenuHeight] = useState(0);
 
@@ -45,7 +46,16 @@ const Header = () => {
   const isActive = (path) => location.pathname === path;
   const handleNavClick = () => setMenuOpen(false);
 
-  useEffect(() => { setMenuOpen(false); }, [location.pathname]);
+  useEffect(() => { setMenuOpen(false); setUserMenuOpen(false); }, [location.pathname]);
+
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    const close = (e) => {
+      if (!e.target.closest('.header-user-menu')) setUserMenuOpen(false);
+    };
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [userMenuOpen]);
 
   useEffect(() => {
     if (menuRef.current) {
@@ -202,14 +212,31 @@ const Header = () => {
               ))}
             </ul>
             <div className="d-flex align-items-center gap-2">
-              <div className="d-flex align-items-center me-2">
-                <i className="fas fa-user-circle me-1 text-muted"></i>
-                <span className="text-muted small">
-                  {displayName}
-                  {user && (
-                    <span className={`badge badge-role ms-2 ${roleBadgeClass}`}>{roleDisplayName}</span>
-                  )}
-                </span>
+              <div className="header-user-menu position-relative me-2">
+                <button
+                  type="button"
+                  className="btn btn-link text-decoration-none d-flex align-items-center p-0"
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  aria-haspopup="menu"
+                  aria-expanded={userMenuOpen}
+                >
+                  <i className="fas fa-user-circle me-1 text-muted"></i>
+                  <span className="text-muted small">
+                    {displayName}
+                    {user && (
+                      <span className={`badge badge-role ms-2 ${roleBadgeClass}`}>{roleDisplayName}</span>
+                    )}
+                  </span>
+                  <i className="fas fa-caret-down ms-1 text-muted small"></i>
+                </button>
+                {userMenuOpen && (
+                  <div className="dropdown-menu dropdown-menu-end show" role="menu"
+                       style={{ position: 'absolute', right: 0, top: '100%', marginTop: 6 }}>
+                    <Link to="/profile" className="dropdown-item" role="menuitem">
+                      <i className="fas fa-id-card me-2"></i>{t('header.myProfile')}
+                    </Link>
+                  </div>
+                )}
               </div>
               <button onClick={handleLogout} className="btn btn-danger btn-sm">
                 <i className="fas fa-sign-out-alt me-1"></i>{t('common.logout')}
@@ -236,7 +263,8 @@ const Header = () => {
           style={{ maxHeight: menuOpen ? `${menuHeight}px` : '0' }}
         >
           <div ref={menuRef}>
-            <div className="d-flex align-items-center gap-2 px-4 pt-3 pb-2">
+            <Link to="/profile" onClick={handleNavClick}
+                  className="d-flex align-items-center gap-2 px-4 pt-3 pb-2 text-decoration-none text-reset">
               <i className="fas fa-user-circle text-primary" style={{ fontSize: '1.3rem' }}></i>
               <div className="lh-sm">
                 <div className="fw-semibold small">{displayName}</div>
@@ -249,7 +277,7 @@ const Header = () => {
                   {roleDisplayName}
                 </span>
               )}
-            </div>
+            </Link>
 
             <hr className="my-2 mx-3 opacity-10" />
 

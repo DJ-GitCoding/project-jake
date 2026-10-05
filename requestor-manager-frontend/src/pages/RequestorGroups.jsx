@@ -55,6 +55,10 @@ const RequestorGroups = () => {
   });
   const [submitting, setSubmitting] = useState(false);
 
+  const [fieldsGroup, setFieldsGroup] = useState(null);
+  const [memberFields, setMemberFields] = useState([]);
+  const [savingFields, setSavingFields] = useState(false);
+
   const [introspectionDefault, setIntrospectionDefault] = useState('');
 
   useEffect(() => {
@@ -314,6 +318,38 @@ const RequestorGroups = () => {
     }
   };
 
+  const handleOpenMemberFields = async (group) => {
+    setFieldsGroup(group);
+    setMemberFields([]);
+    try {
+      const res = await requestorGroupsApi.getUserFields(group.id);
+      setMemberFields((res.data.data || []).map((f) => ({ ...f, options: f.options || '', description: f.description || '' })));
+    } catch (err) {
+      console.error('Failed to load member fields:', err);
+      showError(t('requestorGroups.memberFields.loadFailed'));
+    }
+  };
+
+  const updateMemberField = (i, patch) =>
+    setMemberFields(memberFields.map((f, j) => (j === i ? { ...f, ...patch } : f)));
+
+  const handleSaveMemberFields = async () => {
+    setSavingFields(true);
+    try {
+      const payload = memberFields
+        .filter((f) => (f.label || '').trim())
+        .map(({ id, label, description, dataType, options }) => ({ id, label, description, dataType, options }));
+      await requestorGroupsApi.updateUserFields(fieldsGroup.id, payload);
+      success(t('requestorGroups.memberFields.saved'));
+      setFieldsGroup(null);
+    } catch (err) {
+      console.error('Failed to save member fields:', err);
+      showError(err.response?.data?.message || t('requestorGroups.memberFields.saveFailed'));
+    } finally {
+      setSavingFields(false);
+    }
+  };
+
   const handleDelete = async (group) => {
     const confirmed = await confirm(
       t('requestorGroups.deleteConfirm.title'),
@@ -459,6 +495,15 @@ const RequestorGroups = () => {
                           title={t('common.edit')}
                         >
                           <i className="fas fa-edit"></i>
+                        </button>
+                      )}
+                      {canEdit(group) && (
+                        <button
+                          className="btn btn-sm btn-outline-secondary"
+                          onClick={() => handleOpenMemberFields(group)}
+                          title={t('requestorGroups.memberFields.button')}
+                        >
+                          <i className="fas fa-id-card"></i>
                         </button>
                       )}
                       {canDelete && (
@@ -727,6 +772,79 @@ const RequestorGroups = () => {
           </div>
 
         </form>
+      </Modal>
+
+      <Modal
+        show={!!fieldsGroup}
+        onHide={() => setFieldsGroup(null)}
+        title={t('requestorGroups.memberFields.title', { name: fieldsGroup?.name || '' })}
+        size="lg"
+        scrollable
+        footer={
+          <>
+            <button type="button" className="btn btn-secondary" onClick={() => setFieldsGroup(null)} disabled={savingFields}>
+              {t('common.cancel')}
+            </button>
+            <button type="button" className="btn btn-primary" onClick={handleSaveMemberFields} disabled={savingFields}>
+              {savingFields
+                ? <><span className="spinner-border spinner-border-sm me-2"></span>{t('common.saving')}</>
+                : <><i className="fas fa-save me-2"></i>{t('common.save')}</>}
+            </button>
+          </>
+        }
+      >
+        <p className="form-text mt-0">{t('requestorGroups.memberFields.help')}</p>
+        {memberFields.length === 0 && (
+          <div className="text-muted fst-italic small mb-2">{t('requestorGroups.memberFields.none')}</div>
+        )}
+        {memberFields.map((f, i) => (
+          <div className="card mb-2" key={f.id ?? `new-${i}`}>
+            <div className="card-body py-2">
+              <div className="row g-2 align-items-end">
+                <div className="col-md-5">
+                  <label className="form-label small mb-1">{t('requestorGroups.memberFields.label')}</label>
+                  <input className="form-control form-control-sm" value={f.label}
+                         placeholder={t('requestorGroups.memberFields.labelPlaceholder')}
+                         onChange={(e) => updateMemberField(i, { label: e.target.value })} />
+                </div>
+                <div className="col-md-3">
+                  <label className="form-label small mb-1">{t('requestorGroups.memberFields.type')}</label>
+                  <select className="form-select form-select-sm" value={f.dataType}
+                          onChange={(e) => updateMemberField(i, { dataType: e.target.value })}>
+                    <option value="text">{t('requestorGroups.memberFields.types.text')}</option>
+                    <option value="number">{t('requestorGroups.memberFields.types.number')}</option>
+                    <option value="date">{t('requestorGroups.memberFields.types.date')}</option>
+                    <option value="select">{t('requestorGroups.memberFields.types.select')}</option>
+                  </select>
+                </div>
+                <div className="col-md-3"></div>
+                <div className="col-md-1 text-end">
+                  <button type="button" className="btn btn-sm btn-outline-danger" title={t('common.delete')}
+                          onClick={() => setMemberFields(memberFields.filter((_, j) => j !== i))}>
+                    <i className="fas fa-trash"></i>
+                  </button>
+                </div>
+                {f.dataType === 'select' && (
+                  <div className="col-12">
+                    <label className="form-label small mb-1">{t('requestorGroups.memberFields.options')}</label>
+                    <input className="form-control form-control-sm" value={f.options}
+                           placeholder={t('requestorGroups.memberFields.optionsPlaceholder')}
+                           onChange={(e) => updateMemberField(i, { options: e.target.value })} />
+                  </div>
+                )}
+                <div className="col-12">
+                  <label className="form-label small mb-1">{t('requestorGroups.memberFields.description')}</label>
+                  <input className="form-control form-control-sm" value={f.description}
+                         onChange={(e) => updateMemberField(i, { description: e.target.value })} />
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+        <button type="button" className="btn btn-sm btn-outline-primary"
+                onClick={() => setMemberFields([...memberFields, { label: '', dataType: 'text', options: '', description: '' }])}>
+          <i className="fas fa-plus me-1"></i>{t('requestorGroups.memberFields.add')}
+        </button>
       </Modal>
 
       {/* Detail Modal */}

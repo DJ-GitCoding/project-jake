@@ -94,7 +94,7 @@ const WorkflowStepper = ({ status, testResult }) => {
                 color: textColor,
               }}>{stepLabels[step.key]}</span>
               {isCurrent && step.key === 'TESTING' && testResult && (
-                <span className={`badge bg-${testResult === 'PASSED' ? 'success' : 'danger'} mt-1`} style={{ fontSize: 9 }}>
+                <span className={`badge bg-${testResult === 'PASSED' ? 'success' : testResult === 'PENDING' ? 'warning text-dark' : 'danger'} mt-1`} style={{ fontSize: 9 }}>
                   {testResult}
                 </span>
               )}
@@ -184,7 +184,9 @@ const TestDiagnostics = ({ diagnostics }) => {
   const rdapResults = diagnostics.rdapResults || [];
   const attempts = diagnostics.attempts || [];
   const summary = diagnostics.summary || {};
-  const failedChecks = (diagnostics.checks || []).filter(c => !c.passed);
+  const failedChecks = (diagnostics.checks || []).filter(c => !c.passed && !c.pending);
+  const pendingChecks = (diagnostics.checks || []).filter(c => c.pending);
+  const memberInformation = diagnostics.memberInformation;
 
   return (
     <div className="mt-3">
@@ -233,6 +235,51 @@ const TestDiagnostics = ({ diagnostics }) => {
             </ul>
           )}
 
+          {memberInformation && (
+            <div className="mt-3">
+              <div className="small fw-semibold mb-1">
+                <i className="fa-solid fa-id-card me-1" />{t('subscriptions.testPanel.memberInformation')}
+              </div>
+              {(memberInformation.member?.name || memberInformation.member?.email) && (
+                <div className="small text-muted mb-1">
+                  {t('subscriptions.testPanel.memberCheckedFor', {
+                    member: [memberInformation.member?.name, memberInformation.member?.email && `<${memberInformation.member.email}>`]
+                      .filter(Boolean).join(' '),
+                  })}
+                </div>
+              )}
+              <table className="table table-sm small mb-0">
+                <tbody>
+                  {(memberInformation.fields || []).map((f) => (
+                    <tr key={f.key}>
+                      <td className="text-muted" style={{ width: '40%' }}>{f.label}</td>
+                      <td>
+                        {f.value
+                          ? f.value
+                          : <span className="text-danger"><i className="fa-solid fa-circle-xmark me-1" />{t('subscriptions.testPanel.memberValueMissing')}</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {pendingChecks.length > 0 && (
+            <div className="mt-3">
+              <div className="small fw-semibold mb-1">{t('subscriptions.testPanel.pendingChecks')}</div>
+              <ul className="small mb-0 ps-3">
+                {pendingChecks.map((c, i) => (
+                  <li key={i}>
+                    {c.name}
+                    {c.message && <div>{c.message}</div>}
+                    {c.detail && <div className="text-muted font-monospace">{c.detail}</div>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {failedChecks.length > 0 && (
             <div className="mt-3">
               <div className="small fw-semibold mb-1">{t('subscriptions.testPanel.failedChecks')}</div>
@@ -240,6 +287,7 @@ const TestDiagnostics = ({ diagnostics }) => {
                 {failedChecks.map((c, i) => (
                   <li key={i}>
                     {c.name}
+                    {c.message && <div>{c.message}</div>}
                     {c.detail && <div className="text-muted font-monospace">{c.detail}</div>}
                   </li>
                 ))}
@@ -260,6 +308,7 @@ const TestResultPanel = ({ detail, onRunTest, running, lastRun }) => {
   const hasResult = !!detail.testResult;
   const passed = detail.testResult === 'PASSED';
   const failed = detail.testResult === 'FAILED';
+  const pending = detail.testResult === 'PENDING';
   /* Prefer the run just made; otherwise what the last one recorded on the subscription. */
   const diagnostics = lastRun?.diagnostics || detail.testDiagnostics || null;
 
@@ -285,6 +334,11 @@ const TestResultPanel = ({ detail, onRunTest, running, lastRun }) => {
             <i className="fa-solid fa-circle-xmark me-1" />{t('subscriptions.testPanel.testsFailed')}
           </span>
         )}
+        {hasResult && pending && (
+          <span className="badge bg-warning text-dark">
+            <i className="fa-solid fa-hourglass-half me-1" />{t('subscriptions.testPanel.testsPending')}
+          </span>
+        )}
       </div>
       <div className="card-body">
         {/* Guidance text */}
@@ -298,6 +352,10 @@ const TestResultPanel = ({ detail, onRunTest, running, lastRun }) => {
             <>
               {t('subscriptions.testPanel.guidancePassed.p1')} <strong>{t('subscriptions.testPanel.activated')}</strong>{t('subscriptions.testPanel.guidancePassed.p2')}
             </>
+          ) : pending ? (
+            <>
+              {t('subscriptions.testPanel.guidancePending')}
+            </>
           ) : testing ? (
             <>
               {t('subscriptions.testPanel.guidanceFailed')}
@@ -308,6 +366,20 @@ const TestResultPanel = ({ detail, onRunTest, running, lastRun }) => {
             </>
           )}
         </div>
+
+        {hasResult && !passed && (diagnostics?.checks || []).some(c => !c.passed) && (
+          <div className={`alert ${pending ? 'alert-warning' : 'alert-danger'} py-2 mb-3`} style={{ fontSize: 13 }}>
+            <div className="fw-semibold mb-1">{t('subscriptions.testPanel.whyNotPassed')}</div>
+            <ul className="mb-0 ps-3">
+              {diagnostics.checks.filter(c => !c.passed).map((c, i) => (
+                <li key={i}>
+                  <strong>{c.name}{c.pending ? ` (${t('subscriptions.testPanel.pendingLabel')})` : ''}:</strong>{' '}
+                  {c.message || c.detail}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Test execution controls */}
         {testing && <div className="d-flex gap-2 flex-wrap mb-3">
@@ -758,7 +830,7 @@ const Subscriptions = () => {
                     )}
                   </td>
                   <td><StatusBadge status={sub.status} /></td>
-                  <td>{sub.testResult ? <span className={`badge bg-${sub.testResult === 'PASSED' ? 'success' : 'danger'}`}>{sub.testResult}</span> : <span className="text-muted">—</span>}</td>
+                  <td>{sub.testResult ? <span className={`badge bg-${sub.testResult === 'PASSED' ? 'success' : sub.testResult === 'PENDING' ? 'warning text-dark' : 'danger'}`}>{sub.testResult}</span> : <span className="text-muted">—</span>}</td>
                   <td className="text-muted small">{sub.createdAt ? new Date(sub.createdAt).toLocaleDateString() : '—'}</td>
                   <td>
                     <div className="btn-group btn-group-sm">
@@ -872,7 +944,7 @@ const Subscriptions = () => {
                 <div className="d-flex gap-2 mb-3 flex-wrap">
                   <StatusBadge status={detail.status} />
                   {detail.testResult && (
-                    <span className={`badge bg-${detail.testResult === 'PASSED' ? 'success' : 'danger'}`}>
+                    <span className={`badge bg-${detail.testResult === 'PASSED' ? 'success' : detail.testResult === 'PENDING' ? 'warning text-dark' : 'danger'}`}>
                       {t('subscriptions.detail.testLabel', { result: detail.testResult })}
                     </span>
                   )}

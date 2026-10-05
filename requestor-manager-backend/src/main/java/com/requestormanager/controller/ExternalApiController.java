@@ -53,6 +53,8 @@ public class ExternalApiController {
     private final DataHolderGroupRepository dataHolderGroupRepository;
     private final com.requestormanager.repository.SubscriptionRequestRepository subscriptionRequestRepository;
     private final RestTemplate restTemplate;
+    private final com.requestormanager.service.RequestorUserFieldService userFieldService;
+    private final com.requestormanager.service.KeycloakUserService keycloakUserService;
 
     /**
      * Simple in-memory cache for template request types.
@@ -152,6 +154,7 @@ public class ExternalApiController {
         // differentiators (access level, effective dates) so that distinct subscriptions
         // under the same template are preserved. ----
         List<ExternalApiDto.AgreementSummary> uniqueAgreements = deduplicateAgreements(allAgreements);
+        markMissingUserFields(introspectionResult.getSubject(), introspectionResult.getEmail(), allAgreements);
 
         ExternalApiDto.AgreementsResponse response = ExternalApiDto.AgreementsResponse.builder()
             .userSubject(introspectionResult.getSubject())
@@ -162,6 +165,39 @@ public class ExternalApiController {
             .build();
 
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /** Tell the member, per agreement, which required member information they lack. */
+    private void markMissingUserFields(String subject, String tokenEmail,
+                                       List<ExternalApiDto.AgreementSummary> agreements) {
+        if (subject == null || agreements.isEmpty()) return;
+        Map<String, String> memberValues = null;
+        Map<Long, List<com.requestormanager.entity.SubscriptionRequest>> byGroup = new HashMap<>();
+
+        for (ExternalApiDto.AgreementSummary agreement : agreements) {
+            if (agreement.getRequestorGroupId() == null || agreement.getTemplateId() == null) continue;
+            var subscription = byGroup.computeIfAbsent(agreement.getRequestorGroupId(),
+                            subscriptionRequestRepository::findByRequestorGroupId).stream()
+                    .filter(sr -> agreement.getTemplateId().equals(sr.getTemplateId())
+                            && sr.getDataHolderGroup() != null
+                            && Objects.equals(sr.getDataHolderGroup().getCode(), agreement.getDataHolderGroupCode())
+                            && sr.getStatus() == com.requestormanager.entity.SubscriptionRequest.SubscriptionStatus.ACTIVE)
+                    .findFirst().orElse(null);
+            if (subscription == null || userFieldService.requiredFields(subscription).isEmpty()) {
+                agreement.setMissingUserFields(List.of());
+                continue;
+            }
+            if (memberValues == null) {
+                var identity = keycloakUserService.lookupIdentity(subject);
+                memberValues = userFieldService.memberValues(subject,
+                        identity != null ? identity.firstName() : null,
+                        identity != null ? identity.lastName() : null,
+                        identity != null ? identity.email() : tokenEmail);
+            }
+            agreement.setMissingUserFields(userFieldService.memberFields(subscription, memberValues).missing().stream()
+                    .map(f -> Map.of("key", f.key(), "label", f.label()))
+                    .toList());
+        }
     }
 
     /**

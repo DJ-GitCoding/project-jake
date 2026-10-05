@@ -106,6 +106,17 @@ public class SubscriptionController {
         return ResponseEntity.ok(ApiResponse.success("Subscription request updated successfully", response));
     }
 
+    @PutMapping("/{id}/user-field-mapping")
+    @Operation(summary = "Map the agreement's required member fields to the group's member fields",
+               description = "Body: template field key to std:<key> or custom:<field id>. Takes effect on the next "
+                           + "request; members missing a mapped value cannot use the agreement.")
+    public ResponseEntity<ApiResponse<SubscriptionRequestResponse>> updateUserFieldMapping(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> mapping) {
+        SubscriptionRequestResponse response = subscriptionService.updateUserFieldMapping(id, mapping);
+        return ResponseEntity.ok(ApiResponse.success("Member field mapping updated", response));
+    }
+
     @PostMapping("/{id}/signing-keys")
     @Operation(summary = "Generate this subscription's signing keys",
                description = "Creates a new Ed25519 key pair for signing calls to the data holder group and "

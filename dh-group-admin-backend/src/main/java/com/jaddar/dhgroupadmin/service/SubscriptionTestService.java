@@ -59,6 +59,7 @@ public class SubscriptionTestService {
 
     private static final String RESULT_PASSED = "PASSED";
     private static final String RESULT_FAILED = "FAILED";
+    private static final String RESULT_PENDING = "PENDING";
 
     /*
      * Requestor-facing failure text. These reach an external party's screen, so they say what went
@@ -95,6 +96,7 @@ public class SubscriptionTestService {
     private final AgreementSubscriptionService subscriptionService;
     private final ResponseMapper mapper;
     private final WebClient.Builder webClientBuilder;
+    private final com.jaddar.dhgroupadmin.repository.SubscriptionCredentialRepository subscriptionCredentials;
 
     @Value("${subscription.test.data-holder-timeout-seconds:15}")
     private long dataHolderTimeoutSeconds;
@@ -110,6 +112,7 @@ public class SubscriptionTestService {
         private final String name;
         private final String description;
         private final boolean passed;
+        private final boolean pending;
         private final String errorMessage;
         private final String internalDetail;
     }
@@ -126,7 +129,10 @@ public class SubscriptionTestService {
         private final List<TestCheck> checks;
         private final List<Map<String, Object>> rdapTestResults;
         private final Map<String, Object> summary;
+        private final Map<String, Object> memberInformation;
     }
+
+    public record MemberTestInput(Map<String, String> member, Map<String, String> fields) {}
 
     /** The subscription after approval, and the test report when the automatic test ran. */
     public record ApprovalOutcome(AgreementSubscription subscription, TestReport report) {}
@@ -161,6 +167,13 @@ public class SubscriptionTestService {
      */
     @Transactional
     public TestReport runTest(String requestId, String actor) {
+        return runTest(requestId, actor, null, false);
+    }
+
+    /** Run the test with the starting member's information, as the requestor manager signed it. */
+    @Transactional
+    public TestReport runTest(String requestId, String actor, MemberTestInput signedMemberInformation,
+                              boolean fromRequestorManager) {
         AgreementSubscription sub = subscriptionRepository.findByRequestId(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Subscription not found: " + requestId));
 
@@ -181,6 +194,9 @@ public class SubscriptionTestService {
         checks.add(checkDataHolderGroup(sub));
         checks.add(checkEffectiveWindow(sub));
         checks.add(checkSubscriptionRetrieval(sub));
+        TestCheck memberCheck = checkMemberInformation(sub, signedMemberInformation, fromRequestorManager);
+        if (memberCheck != null) checks.add(memberCheck);
+        Map<String, Object> memberReview = memberReview(sub, signedMemberInformation);
 
         DataHolderTestOutcome dhOutcome = runDataHolderRetrievalTest(sub);
         checks.add(dhOutcome.check());
@@ -188,13 +204,15 @@ public class SubscriptionTestService {
 
         long passed = checks.stream().filter(TestCheck::isPassed).count();
         boolean allPassed = passed == checks.size();
-        String result = allPassed ? RESULT_PASSED : RESULT_FAILED;
+        boolean anyFailed = checks.stream().anyMatch(c -> !c.isPassed() && !c.isPending());
+        String result = allPassed ? RESULT_PASSED : anyFailed ? RESULT_FAILED : RESULT_PENDING;
         long durationMs = System.currentTimeMillis() - startedAt;
 
         String details = buildDetails(checks, passed, dhOutcome);
         String internalDetails = internalDiagnostic(checks);
 
         Map<String, Object> diagnostics = buildDiagnostics(checks, dhOutcome, result, durationMs);
+        diagnostics.put("memberInformation", memberReview);
 
         sub.setTestResult(result);
         sub.setTestCompletedAt(LocalDateTime.now());
@@ -221,6 +239,7 @@ public class SubscriptionTestService {
                 .rdapTestResults(dhOutcome.rdapTestResults())
                 .summary(buildSummary(checks, (int) passed, dhOutcome, durationMs))
                 .diagnostics(diagnostics)
+                .memberInformation(memberReview)
                 .build();
     }
 
@@ -237,6 +256,7 @@ public class SubscriptionTestService {
             entry.put("name", check.getName());
             entry.put("description", check.getDescription());
             entry.put("passed", check.isPassed());
+            entry.put("pending", check.isPending());
             entry.put("message", check.getErrorMessage());
             entry.put("detail", check.getInternalDetail());
             checkMaps.add(entry);
@@ -427,6 +447,109 @@ public class SubscriptionTestService {
                 .internalDetail(missing.isEmpty() ? null
                         : "Mapped subscription payload missing: " + String.join(", ", missing))
                 .build();
+    }
+
+    /** The member fields the subscription's pinned template requires, by key with their labels. */
+    @SuppressWarnings("unchecked")
+    private Map<String, String> requiredUserFields(AgreementSubscription sub) {
+        Map<String, String> fields = new LinkedHashMap<>();
+        Map<String, Object> snapshot = sub.getTemplateSnapshot();
+        if (snapshot != null) {
+            if (snapshot.get("userFields") instanceof List<?> list) {
+                for (Object o : list) {
+                    if (o instanceof Map<?, ?> m && m.get("key") instanceof String key) {
+                        fields.put(key, m.get("label") instanceof String label ? label : key);
+                    }
+                }
+            }
+        } else if (sub.getTemplate() != null) {
+            sub.getTemplate().getUserFields().forEach(f -> fields.put(f.getKey(), f.getLabel()));
+        }
+        return fields;
+    }
+
+    /** Confirm the requestor group supplies every member field the template requires. */
+    private TestCheck checkMemberInformation(AgreementSubscription sub, MemberTestInput input,
+                                             boolean fromRequestorManager) {
+        Map<String, String> required = requiredUserFields(sub);
+        if (required.isEmpty()) return null;
+        Map<String, String> memberInformation = input != null ? input.fields() : null;
+
+        String name = "Requestor Member Information";
+        String description = "Verify the requestor group supplies every member field this agreement requires";
+        if (memberInformation == null) {
+            String[] reason = missingMemberInformationReason(sub, fromRequestorManager);
+            return TestCheck.builder().name(name).description(description).passed(false).pending(true)
+                    .errorMessage(reason[0])
+                    .internalDetail(reason[1])
+                    .build();
+        }
+
+        List<String> missing = new ArrayList<>();
+        required.forEach((key, label) -> {
+            String value = memberInformation.get(key);
+            if (value == null || value.isBlank()) missing.add(label);
+        });
+
+        return TestCheck.builder().name(name).description(description)
+                .passed(missing.isEmpty())
+                .errorMessage(missing.isEmpty() ? null
+                        : "The member who started this subscription has no value for: " + String.join(", ", missing)
+                          + ". Map these to member fields and fill them in on that member's profile, then run the test again.")
+                .internalDetail(missing.isEmpty() ? null : "Signed member information lacked: " + String.join(", ", missing))
+                .build();
+    }
+
+    /** Why a run arrived without signed member information, as {message, technical detail}. */
+    private String[] missingMemberInformationReason(AgreementSubscription sub, boolean fromRequestorManager) {
+        var credential = subscriptionCredentials.findByRequestIdAndIsActiveTrue(sub.getRequestId()).orElse(null);
+        if (credential == null) {
+            return new String[] {
+                    "Member information cannot be verified yet: no requestor manager credentials have been issued "
+                            + "for this subscription. The data holder group issues them and the requestor group enters "
+                            + "them in its requestor manager; the test then runs again automatically.",
+                    "No active subscription credential exists for " + sub.getRequestId() };
+        }
+        if (credential.getPublicKey() == null || credential.getPublicKey().isBlank()) {
+            return new String[] {
+                    "Member information cannot be verified yet: the requestor group's signing key has not been "
+                            + "registered for this subscription. The requestor group generates it in its requestor "
+                            + "manager and the data holder group registers it here; the test then runs again "
+                            + "automatically.",
+                    "Subscription credential " + credential.getClientId() + " has no public key registered" };
+        }
+        if (!fromRequestorManager) {
+            return new String[] {
+                    "Member information is only supplied when the requestor manager runs the test, and this run was "
+                            + "started from the data holder group. The requestor manager runs it automatically; it can "
+                            + "also be run from the subscription in the requestor manager.",
+                    "Test run started from the group admin; no member information is available to it" };
+        }
+        return new String[] {
+                "Member information cannot be verified: the requestor manager's test run was not signed with the "
+                        + "signing key registered for this subscription. Check that the key registered here is the one "
+                        + "the requestor group generated most recently.",
+                "Requestor manager run for " + sub.getRequestId() + " arrived unsigned or signed with an unregistered key "
+                        + "(registered key id " + credential.getClientId() + ")" };
+    }
+
+    /** The member information the check received, kept with the test for review. */
+    private Map<String, Object> memberReview(AgreementSubscription sub, MemberTestInput input) {
+        Map<String, String> required = requiredUserFields(sub);
+        if (required.isEmpty() || input == null) return null;
+        List<Map<String, Object>> fields = new ArrayList<>();
+        required.forEach((key, label) -> {
+            Map<String, Object> field = new LinkedHashMap<>();
+            field.put("key", key);
+            field.put("label", label);
+            String value = input.fields() != null ? input.fields().get(key) : null;
+            field.put("value", value == null || value.isBlank() ? null : value);
+            fields.add(field);
+        });
+        Map<String, Object> review = new LinkedHashMap<>();
+        review.put("member", input.member() != null ? input.member() : Map.of());
+        review.put("fields", fields);
+        return review;
     }
 
     // ==================== Phase 2: Retrieval ====================
@@ -702,9 +825,14 @@ public class SubscriptionTestService {
         }
 
         List<String> failed = checks.stream()
-                .filter(c -> !c.isPassed())
+                .filter(c -> !c.isPassed() && !c.isPending())
                 .map(TestCheck::getName)
                 .toList();
+        if (failed.isEmpty()) {
+            List<String> pending = checks.stream().filter(TestCheck::isPending).map(TestCheck::getName).toList();
+            return String.format("%d of %d checks passed; waiting on: %s. The requestor manager completes these "
+                    + "automatically.", passed, total, String.join(", ", pending));
+        }
 
         return String.format("%d of %d checks did not pass: %s. See the checks below for what to do next.",
                 failed.size(), total, String.join(", ", failed));

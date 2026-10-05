@@ -693,6 +693,13 @@
       "rdapSummary": "{{passed}}/{{total}} queries passed",
       "noQueriesRun": "No RDAP queries were run.",
       "failedChecks": "Checks that did not pass",
+      "pendingChecks": "Waiting on the requestor manager",
+      "whyNotPassed": "Why the test has not passed",
+      "pendingLabel": "waiting",
+      "memberInformation": "Member information received",
+      "memberCheckedFor": "From the member who started the subscription: {{member}}",
+      "memberValueMissing": "Not supplied",
+      "testsPending": "Waiting on requestor manager",
       "levelBadge": "L{{level}}",
       "durationMs": "{{ms}} ms",
       "expectedActual": "expected {{expected}} · got {{actual}}",
@@ -707,7 +714,8 @@
         "p2": " automatically. The results below are kept for review."
       },
       "guidanceFailed": "Tests did not pass. Review the details below and re-run the tests after correcting any issues; the subscription activates automatically once they pass. You can also manually set the result.",
-      "guidanceRecorded": "The results of the last test run, kept for review."
+      "guidanceRecorded": "The results of the last test run, kept for review.",
+      "guidancePending": "Everything that can be checked here passed. The remaining check needs member information that only the requestor manager can supply, signed with this subscription's key; it runs the test again automatically once credentials are exchanged, and the subscription activates when that run passes."
     },
     "detail": {
       "live": "Live",
@@ -1293,6 +1301,11 @@
       "subscriptionFieldsHint": "Values the requestor group must supply when subscribing to this agreement.",
       "addSubscriptionField": "Add field",
       "noSubscriptionFields": "No requestor group fields yet.",
+      "userFields": "Requestor Member Information",
+      "userFieldsHint": "Information every member of the requestor group must have on their profile to make requests under this agreement. Members missing any of it cannot use the agreement. The requestor group supplies it when a data holder verifies the member at request time.",
+      "addUserField": "Add Custom Field",
+      "userFieldLabel": "Field name",
+      "userFieldLabelPlaceholder": "e.g., Blood Type",
       "fieldName": "Name *",
       "fieldType": "Type",
       "fieldRequired": "Required",

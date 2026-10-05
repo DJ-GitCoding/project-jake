@@ -55,6 +55,27 @@ public class DataHolderGroupClientService {
      */
     private static final String DH_UNREACHABLE_MESSAGE = "Could not reach the data holder. Please try again later.";
     private static final String DH_ERROR_MESSAGE = "An unexpected error occurred while contacting the data holder.";
+    private static final String NO_CREDENTIALS_MESSAGE =
+            "No data holder group credentials have been entered for this subscription. Enter the client ID and "
+            + "secret the data holder group issued for it under the subscription's Data Holder Group Credentials, "
+            + "then try again.";
+    private static final String CREDENTIALS_REJECTED_MESSAGE =
+            "The data holder group did not accept this subscription's credentials. Check that the client ID and "
+            + "secret entered for it are the ones the data holder group issued, and that its signing key is "
+            + "registered with the data holder group.";
+
+    /** What to tell the user when a call about one subscription fails in transit. */
+    private String transportFailure(RestClientException e, String requestId) {
+        if (e instanceof org.springframework.web.client.HttpClientErrorException.Unauthorized
+                || e instanceof org.springframework.web.client.HttpClientErrorException.Forbidden) {
+            boolean entered = subscriptionRequestRepository.findByExternalRequestId(requestId)
+                    .map(sub -> sub.getDhgClientId() != null && !sub.getDhgClientId().isBlank()
+                            && sub.getDhgClientSecret() != null && !sub.getDhgClientSecret().isBlank())
+                    .orElse(false);
+            return entered ? CREDENTIALS_REJECTED_MESSAGE : NO_CREDENTIALS_MESSAGE;
+        }
+        return DH_UNREACHABLE_MESSAGE;
+    }
 
     /**
      * Get available templates from a specific data holder
@@ -447,7 +468,7 @@ public class DataHolderGroupClientService {
             return DataHolderGroupDto.WorkflowActionResponse.builder()
                     .success(false)
                     .requestId(requestId)
-                    .message(DH_UNREACHABLE_MESSAGE)
+                    .message(transportFailure(e, requestId))
                     .dataHolderGroupCode(dataHolderGroup.getCode())
                     .build();
         } catch (Exception e) {
@@ -472,25 +493,43 @@ public class DataHolderGroupClientService {
      * Request the data holder to run tests for a subscription
      */
     public DataHolderGroupDto.TestExecutionResponse runTest(Long dataHolderGroupId, String requestId) {
+        return runTest(dataHolderGroupId, requestId, null);
+    }
+
+    public record MemberTest(Map<String, String> member, Map<String, String> fields) {}
+
+    /** Run a subscription's test. */
+    public DataHolderGroupDto.TestExecutionResponse runTest(Long dataHolderGroupId, String requestId,
+                                                            MemberTest memberTest) {
         DataHolderGroup dataHolderGroup = dataHolderGroupRepository.findById(dataHolderGroupId)
                 .orElseThrow(() -> new RuntimeException("Data holder group not found: " + dataHolderGroupId));
         
         String url = dataHolderGroup.getExternalApiUrl() + "/" + requestId + "/run-test";
         
         try {
-            HttpHeaders headers = createHeaders(dataHolderGroup, requestId);
-            headers.setContentType(MediaType.APPLICATION_JSON);
+            Map<String, Object> body = new HashMap<>();
+            if (memberTest != null) {
+                body.put("member", memberTest.member());
+                body.put("memberInformation", memberTest.fields());
+            }
+            HttpEntity<String> request = signedEntity(dataHolderGroup, requestId, "POST", url, body);
+            boolean signed = request.getHeaders().containsKey(HttpSignatures.SIGNATURE_HEADER);
             
-            HttpEntity<Void> request = new HttpEntity<>(headers);
+            log.info("Sending {} run-test request to {} for subscription {}",
+                    signed ? "signed" : "unsigned", dataHolderGroup.getCode(), requestId);
             
-            log.info("Sending run-test request to {} for subscription {}", dataHolderGroup.getCode(), requestId);
-            
-            ResponseEntity<String> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.POST,
-                    request,
-                    String.class
-            );
+            ResponseEntity<String> response;
+            try {
+                response = restTemplate.exchange(url, HttpMethod.POST, request, String.class);
+            } catch (org.springframework.web.client.HttpClientErrorException.Unauthorized e) {
+                if (!signed) throw e;
+                log.info("Group admin {} did not accept the signature for subscription {} — its signing key may "
+                        + "not be registered yet; running the test without member information", 
+                        dataHolderGroup.getCode(), requestId);
+                HttpHeaders headers = createHeaders(dataHolderGroup, requestId);
+                headers.setContentType(MediaType.APPLICATION_JSON);
+                response = restTemplate.exchange(url, HttpMethod.POST, new HttpEntity<>("{}", headers), String.class);
+            }
             
             if (response.getBody() != null) {
                 Map<String, Object> responseBody = objectMapper.readValue(
@@ -518,7 +557,7 @@ public class DataHolderGroupClientService {
             return DataHolderGroupDto.TestExecutionResponse.builder()
                     .success(false)
                     .requestId(requestId)
-                    .message(DH_UNREACHABLE_MESSAGE)
+                    .message(transportFailure(e, requestId))
                     .dataHolderGroupCode(dataHolderGroup.getCode())
                     .build();
         } catch (Exception e) {
@@ -598,7 +637,7 @@ public class DataHolderGroupClientService {
             return DataHolderGroupDto.WorkflowActionResponse.builder()
                     .success(false)
                     .requestId(requestId)
-                    .message(DH_UNREACHABLE_MESSAGE)
+                    .message(transportFailure(e, requestId))
                     .dataHolderGroupCode(dataHolderGroup.getCode())
                     .build();
         } catch (Exception e) {
@@ -679,7 +718,7 @@ public class DataHolderGroupClientService {
             log.error("Failed to send credentials to {}: {}", dataHolderGroup.getCode(), e.getMessage(), e);
             return SubscriptionCredentialDto.DeliveryResponse.builder()
                     .success(false)
-                    .message(DH_UNREACHABLE_MESSAGE)
+                    .message(transportFailure(e, requestId))
                     .requestId(requestId)
                     .build();
         } catch (Exception e) {
@@ -1012,9 +1051,13 @@ public class DataHolderGroupClientService {
      */
     @SuppressWarnings("unchecked")
     private DataHolderGroupDto.TestResultInfo mapToTestResultInfo(Map<String, Object> testResult) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> memberInformation = testResult.get("memberInformation") instanceof Map<?, ?> m
+                ? (Map<String, Object>) m : null;
         DataHolderGroupDto.TestResultInfo.TestResultInfoBuilder builder = DataHolderGroupDto.TestResultInfo.builder()
                 .result((String) testResult.get("result"))
-                .details((String) testResult.get("details"));
+                .details((String) testResult.get("details"))
+                .memberInformation(memberInformation);
         
         // Parse testedAt
         if (testResult.get("testedAt") != null) {
@@ -1033,6 +1076,7 @@ public class DataHolderGroupClientService {
                             .name((String) tc.get("name"))
                             .description((String) tc.get("description"))
                             .passed(Boolean.TRUE.equals(tc.get("passed")))
+                            .pending(Boolean.TRUE.equals(tc.get("pending")))
                             .errorMessage((String) tc.get("errorMessage"))
                             .build())
                     .collect(Collectors.toList());

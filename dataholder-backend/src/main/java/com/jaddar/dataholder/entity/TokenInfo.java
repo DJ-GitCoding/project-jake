@@ -100,6 +100,10 @@ public class TokenInfo {
      */
     private List<String> audience;
 
+    private java.util.Map<String, String> userFields;
+
+    private List<java.util.Map<String, String>> missingUserFields;
+
     /**
      * Check if token is expired
      */
