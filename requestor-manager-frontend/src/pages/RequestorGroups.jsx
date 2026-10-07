@@ -330,6 +330,18 @@ const RequestorGroups = () => {
     }
   };
 
+  /** Swap the group editor for the member fields editor, keeping the group editor's unsaved changes. */
+  const openMemberFieldsFromEdit = () => {
+    setShowModal(false);
+    handleOpenMemberFields(editingGroup);
+  };
+
+  /** Close the member fields editor and return to the group editor it was opened from. */
+  const closeMemberFields = () => {
+    setFieldsGroup(null);
+    if (editingGroup) setShowModal(true);
+  };
+
   const updateMemberField = (i, patch) =>
     setMemberFields(memberFields.map((f, j) => (j === i ? { ...f, ...patch } : f)));
 
@@ -341,7 +353,7 @@ const RequestorGroups = () => {
         .map(({ id, label, description, dataType, options }) => ({ id, label, description, dataType, options }));
       await requestorGroupsApi.updateUserFields(fieldsGroup.id, payload);
       success(t('requestorGroups.memberFields.saved'));
-      setFieldsGroup(null);
+      closeMemberFields();
     } catch (err) {
       console.error('Failed to save member fields:', err);
       showError(err.response?.data?.message || t('requestorGroups.memberFields.saveFailed'));
@@ -495,15 +507,6 @@ const RequestorGroups = () => {
                           title={t('common.edit')}
                         >
                           <i className="fas fa-edit"></i>
-                        </button>
-                      )}
-                      {canEdit(group) && (
-                        <button
-                          className="btn btn-sm btn-outline-secondary"
-                          onClick={() => handleOpenMemberFields(group)}
-                          title={t('requestorGroups.memberFields.button')}
-                        >
-                          <i className="fas fa-id-card"></i>
                         </button>
                       )}
                       {canDelete && (
@@ -771,18 +774,34 @@ const RequestorGroups = () => {
             )}
           </div>
 
+          {editingGroup && (
+            <>
+              <hr />
+              <div className="d-flex align-items-center justify-content-between gap-3">
+                <div>
+                  <h6 className="text-muted mb-1">{t('requestorGroups.memberFields.button')}</h6>
+                  <div className="form-text mt-0">{t('requestorGroups.memberFields.editHelp')}</div>
+                </div>
+                <button type="button" className="btn btn-outline-secondary flex-shrink-0"
+                        onClick={() => openMemberFieldsFromEdit()}>
+                  <i className="fas fa-id-card me-2"></i>{t('requestorGroups.memberFields.edit')}
+                </button>
+              </div>
+            </>
+          )}
+
         </form>
       </Modal>
 
       <Modal
         show={!!fieldsGroup}
-        onHide={() => setFieldsGroup(null)}
+        onHide={closeMemberFields}
         title={t('requestorGroups.memberFields.title', { name: fieldsGroup?.name || '' })}
         size="lg"
         scrollable
         footer={
           <>
-            <button type="button" className="btn btn-secondary" onClick={() => setFieldsGroup(null)} disabled={savingFields}>
+            <button type="button" className="btn btn-secondary" onClick={closeMemberFields} disabled={savingFields}>
               {t('common.cancel')}
             </button>
             <button type="button" className="btn btn-primary" onClick={handleSaveMemberFields} disabled={savingFields}>

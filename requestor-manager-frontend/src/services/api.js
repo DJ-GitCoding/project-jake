@@ -92,6 +92,12 @@ export const usersApi = {
   update: (id, data) =>
     api.put(`/api/v1/users/${id}`, data),
 
+  getProfile: (id) =>
+    api.get(`/api/v1/users/${id}/profile`),
+
+  updateProfile: (id, data) =>
+    api.put(`/api/v1/users/${id}/profile`, data),
+
   delete: (id) =>
     api.delete(`/api/v1/users/${id}`),
 };

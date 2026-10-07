@@ -92,6 +92,9 @@
     "emailHelp": "Your email is your sign-in name; an administrator can change it.",
     "usedByTitle": "Required by {{agreement}} ({{dataHolderGroup}}) as \"{{asField}}\"",
     "usedByLegend": "Agreements listed under a field require it. A highlighted agreement cannot be used until the field is filled in.",
+    "groupFieldsTitle": "Requestor Group Member Fields",
+    "noGroups": "You are not a member of any requestor group, so no group member fields apply to you.",
+    "noGroupFields": "Your requestor groups ({{groups}}) have not defined any member fields.",
     "save": "Save Profile",
     "saved": "Profile saved",
     "errors": {
@@ -301,15 +304,17 @@
     },
     "memberFields": {
       "button": "Member Fields",
+      "edit": "Edit Member Fields",
+      "editHelp": "Information this group's members fill in on their profile beyond the standard contact details.",
       "title": "Member Fields: {{name}}",
       "help": "Information your members fill in on their profile beyond the standard contact details. When an agreement requires member information, you map each requirement to one of these fields or a standard one; data holders then receive it when they verify a member's request.",
       "none": "No custom member fields yet.",
       "label": "Field name",
-      "labelPlaceholder": "e.g., Blood Type",
+      "labelPlaceholder": "e.g., Custom Field",
       "type": "Type",
       "types": { "text": "Text", "number": "Number", "date": "Date", "select": "Choice" },
       "options": "Choices",
-      "optionsPlaceholder": "Comma-separated, e.g., A+, A-, B+, B-, AB+, AB-, O+, O-",
+      "optionsPlaceholder": "Comma-separated, e.g., Option A, Option B, Option C",
       "description": "Help text",
       "add": "Add Field",
       "saved": "Member fields saved",
@@ -374,6 +379,13 @@
     }
   },
   "users": {
+    "profile": {
+      "title": "Member Profile",
+      "groupFields": "Requestor Group Member Fields",
+      "loading": "Loading profile...",
+      "loadFailed": "This member's profile could not be loaded.",
+      "readOnly": "You can view this member's profile but not change it."
+    },
     "title": "Users",
     "subtitle": "Manage user accounts and group memberships",
     "newUser": "New User",

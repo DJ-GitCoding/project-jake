@@ -35,6 +35,7 @@ import java.util.List;
 public class UserController {
     
     private final KeycloakUserService userService;
+    private final com.requestormanager.service.MemberProfileService memberProfileService;
     
     @PostMapping
     @Operation(summary = "Create user", description = "Create a new user in Keycloak. If user already exists, returns 409 with user details and option to add to group.")
@@ -185,6 +186,21 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success(user));
     }
     
+    @GetMapping("/{id}/profile")
+    @Operation(summary = "Get a member's profile",
+               description = "Standard fields and the custom fields of the member's requestor groups, with whether you may edit them.")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> getUserProfile(@PathVariable String id) {
+        return ResponseEntity.ok(ApiResponse.success(memberProfileService.getMemberProfile(id)));
+    }
+
+    @PutMapping("/{id}/profile")
+    @Operation(summary = "Update a member's profile",
+               description = "Standard fields by key and customValues by custom field id. Names change through PUT /{id}.")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> updateUserProfile(
+            @PathVariable String id, @RequestBody java.util.Map<String, Object> body) {
+        return ResponseEntity.ok(ApiResponse.success("Profile saved", memberProfileService.updateMemberProfile(id, body)));
+    }
+
     @GetMapping("/group/{groupName}")
     @Operation(summary = "Get users by group", description = "Get all users in a specific Keycloak group")
     @ApiResponses(value = {

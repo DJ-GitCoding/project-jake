@@ -1305,7 +1305,7 @@
       "userFieldsHint": "Information every member of the requestor group must have on their profile to make requests under this agreement. Members missing any of it cannot use the agreement. The requestor group supplies it when a data holder verifies the member at request time.",
       "addUserField": "Add Custom Field",
       "userFieldLabel": "Field name",
-      "userFieldLabelPlaceholder": "e.g., Blood Type",
+      "userFieldLabelPlaceholder": "e.g., Custom Field",
       "fieldName": "Name *",
       "fieldType": "Type",
       "fieldRequired": "Required",

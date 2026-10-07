@@ -8,6 +8,7 @@
 
 package com.requestormanager.service;
 
+import com.requestormanager.dto.UserDto;
 import com.requestormanager.entity.RequestorGroup;
 import com.requestormanager.entity.RequestorGroupUserField;
 import com.requestormanager.entity.RequestorUserFieldValue;
@@ -60,9 +61,78 @@ public class MemberProfileService {
         String firstName = identity != null ? identity.firstName() : me.getFirstName();
         String lastName = identity != null ? identity.lastName() : me.getLastName();
         String email = identity != null ? identity.email() : me.getEmail();
+        return buildProfile(me.getSub(), firstName, lastName, email, groupsNamed(me.getGroups()));
+    }
 
-        List<RequestorGroup> groups = memberGroups(me);
-        Map<String, String> values = userFieldService.memberValues(me.getSub(), firstName, lastName, email);
+    /** Save the signed-in member's own profile. */
+    @Transactional
+    public Map<String, Object> updateOwnProfile(Map<String, Object> body) {
+        KeycloakUser me = securityUtils.requireCurrentUser();
+
+        String firstName = text(body.get("first_name"));
+        String lastName = text(body.get("last_name"));
+        if (body.containsKey("first_name") || body.containsKey("last_name")) {
+            if (firstName == null || lastName == null) {
+                throw new BadRequestException("First and last name are required.");
+            }
+            keycloakUserService.updateOwnName(me.getSub(), firstName, lastName);
+        }
+
+        saveProfileFields(me.getSub(), body, groupsNamed(me.getGroups()));
+        log.info("Member {} updated their profile", me.getEmail());
+        return getOwnProfile();
+    }
+
+    /** A member's profile as an administrator sees it, with whether the caller may edit it. */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getMemberProfile(String userId) {
+        KeycloakUser me = securityUtils.requireCurrentUser();
+        UserDto.UserResponse member = keycloakUserService.getUserById(userId);
+        Map<String, Object> profile = buildProfile(userId, member.getFirstName(), member.getLastName(),
+                member.getEmail(), groupsNamed(member.getGroups()));
+        profile.put("editable", canEditMember(me, member));
+        return profile;
+    }
+
+    /** Save a member's profile fields on their behalf. Names are changed through the user record. */
+    @Transactional
+    public Map<String, Object> updateMemberProfile(String userId, Map<String, Object> body) {
+        KeycloakUser me = securityUtils.requireCurrentUser();
+        UserDto.UserResponse member = keycloakUserService.getUserById(userId);
+        if (!canEditMember(me, member)) {
+            throw new AccessDeniedException("You don't have permission to edit this member's profile");
+        }
+        List<RequestorGroup> groups = groupsNamed(member.getGroups());
+        if (!isAdmin(me)) {
+            groups = groups.stream().filter(g -> belongsTo(me, g)).toList();
+        }
+        Map<String, Object> fields = new HashMap<>(body);
+        fields.remove("first_name");
+        fields.remove("last_name");
+        saveProfileFields(userId, fields, groups);
+        log.info("Profile of member {} updated by {}", member.getEmail(), me.getEmail());
+        return getMemberProfile(userId);
+    }
+
+    /** Whether the caller may edit a member's profile, by the same rules as editing the member. */
+    private boolean canEditMember(KeycloakUser me, UserDto.UserResponse member) {
+        if (me.getSub().equals(member.getId())) return true;
+        UserType mine = me.getUserType();
+        UserType theirs = member.getType() != null ? member.getType() : UserType.REQUESTOR_GROUP_USER;
+        if (mine == UserType.JADDAR_MASTER_ADMIN) return true;
+        if (mine == UserType.GROUP_ADMIN) return theirs.getLevel() > mine.getLevel();
+        if (mine == UserType.REQUESTOR_GROUP_ADMIN) {
+            return theirs.getLevel() > mine.getLevel() && member.getGroups() != null
+                    && me.getGroups() != null && member.getGroups().stream()
+                            .anyMatch(g -> me.getGroups().stream().anyMatch(g::equalsIgnoreCase));
+        }
+        return false;
+    }
+
+    /** A member's standard and custom fields, each with its value and the agreements that use it. */
+    private Map<String, Object> buildProfile(String userId, String firstName, String lastName, String email,
+                                             List<RequestorGroup> groups) {
+        Map<String, String> values = userFieldService.memberValues(userId, firstName, lastName, email);
         Map<String, List<Map<String, Object>>> usage = usageByReference(groups);
 
         List<Map<String, Object>> standard = new ArrayList<>();
@@ -95,27 +165,15 @@ public class MemberProfileService {
         }
 
         Map<String, Object> profile = new LinkedHashMap<>();
-        profile.put("id", me.getSub());
+        profile.put("id", userId);
         profile.put("standardFields", standard);
         profile.put("groups", groupViews);
         return profile;
     }
 
-    /** Save the signed-in member's own profile. */
-    @Transactional
-    public Map<String, Object> updateOwnProfile(Map<String, Object> body) {
-        KeycloakUser me = securityUtils.requireCurrentUser();
-
-        String firstName = text(body.get("first_name"));
-        String lastName = text(body.get("last_name"));
-        if (body.containsKey("first_name") || body.containsKey("last_name")) {
-            if (firstName == null || lastName == null) {
-                throw new BadRequestException("First and last name are required.");
-            }
-            keycloakUserService.updateOwnName(me.getSub(), firstName, lastName);
-        }
-
-        RequestorUserProfile profile = userFieldService.profileFor(me.getSub());
+    /** Save the standard fields in the body, and custom values for fields of the given groups. */
+    private void saveProfileFields(String userId, Map<String, Object> body, List<RequestorGroup> groups) {
+        RequestorUserProfile profile = userFieldService.profileFor(userId);
         if (body.containsKey("phone")) profile.setPhone(limit(text(body.get("phone")), 50, "Phone Number"));
         if (body.containsKey("street_address")) profile.setStreetAddress(limit(text(body.get("street_address")), 255, "Street Address"));
         if (body.containsKey("city")) profile.setCity(limit(text(body.get("city")), 100, "City"));
@@ -124,43 +182,39 @@ public class MemberProfileService {
         if (body.containsKey("country")) profile.setCountry(limit(text(body.get("country")), 100, "Country"));
         profileRepository.save(profile);
 
-        if (body.get("customValues") instanceof Map<?, ?> custom) {
-            Map<Long, RequestorGroupUserField> allowed = new HashMap<>();
-            List<Long> groupIds = memberGroups(me).stream().map(RequestorGroup::getId).toList();
-            if (!groupIds.isEmpty()) {
-                groupFieldRepository.findByRequestorGroupIdInOrderBySortOrderAscIdAsc(groupIds)
-                        .forEach(f -> allowed.put(f.getId(), f));
-            }
-            Map<Long, RequestorUserFieldValue> existing = new HashMap<>();
-            valueRepository.findByKeycloakUserId(me.getSub()).forEach(v -> existing.put(v.getField().getId(), v));
+        if (!(body.get("customValues") instanceof Map<?, ?> custom)) return;
+        Map<Long, RequestorGroupUserField> allowed = new HashMap<>();
+        List<Long> groupIds = groups.stream().map(RequestorGroup::getId).toList();
+        if (!groupIds.isEmpty()) {
+            groupFieldRepository.findByRequestorGroupIdInOrderBySortOrderAscIdAsc(groupIds)
+                    .forEach(f -> allowed.put(f.getId(), f));
+        }
+        Map<Long, RequestorUserFieldValue> existing = new HashMap<>();
+        valueRepository.findByKeycloakUserId(userId).forEach(v -> existing.put(v.getField().getId(), v));
 
-            for (Map.Entry<?, ?> entry : custom.entrySet()) {
-                Long fieldId;
-                try {
-                    fieldId = Long.valueOf(String.valueOf(entry.getKey()));
-                } catch (NumberFormatException e) {
-                    throw new BadRequestException("Unknown member field: " + entry.getKey());
-                }
-                RequestorGroupUserField field = allowed.get(fieldId);
-                if (field == null) {
-                    throw new BadRequestException("That member field does not belong to one of your requestor groups.");
-                }
-                String value = validateValue(field, text(entry.getValue()));
-                RequestorUserFieldValue stored = existing.get(fieldId);
-                if (value == null) {
-                    if (stored != null) valueRepository.delete(stored);
-                } else if (stored == null) {
-                    valueRepository.save(RequestorUserFieldValue.builder()
-                            .keycloakUserId(me.getSub()).field(field).value(value).build());
-                } else {
-                    stored.setValue(value);
-                    valueRepository.save(stored);
-                }
+        for (Map.Entry<?, ?> entry : custom.entrySet()) {
+            Long fieldId;
+            try {
+                fieldId = Long.valueOf(String.valueOf(entry.getKey()));
+            } catch (NumberFormatException e) {
+                throw new BadRequestException("Unknown member field: " + entry.getKey());
+            }
+            RequestorGroupUserField field = allowed.get(fieldId);
+            if (field == null) {
+                throw new BadRequestException("That member field does not belong to a requestor group you can edit for this member.");
+            }
+            String value = validateValue(field, text(entry.getValue()));
+            RequestorUserFieldValue stored = existing.get(fieldId);
+            if (value == null) {
+                if (stored != null) valueRepository.delete(stored);
+            } else if (stored == null) {
+                valueRepository.save(RequestorUserFieldValue.builder()
+                        .keycloakUserId(userId).field(field).value(value).build());
+            } else {
+                stored.setValue(value);
+                valueRepository.save(stored);
             }
         }
-
-        log.info("Member {} updated their profile", me.getEmail());
-        return getOwnProfile();
     }
 
     @Transactional(readOnly = true)
@@ -302,9 +356,10 @@ public class MemberProfileService {
         return value;
     }
 
-    private List<RequestorGroup> memberGroups(KeycloakUser me) {
-        if (me.getGroups() == null || me.getGroups().isEmpty()) return List.of();
-        return requestorGroupRepository.findByNameInIgnoreCase(me.getGroups());
+    private List<RequestorGroup> groupsNamed(List<String> names) {
+        if (names == null || names.isEmpty()) return List.of();
+        return requestorGroupRepository.findByNameInIgnoreCase(
+                names.stream().map(n -> n.toLowerCase(java.util.Locale.ROOT)).toList());
     }
 
     private RequestorGroup findGroup(Long groupId) {

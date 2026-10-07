@@ -13,6 +13,7 @@ import { usersApi, requestorGroupsApi } from '../services/api';
 import Loading from '../components/Loading';
 import Modal from '../components/Modal';
 import MultiSelectDropdown from '../components/MultiSelectDropdown';
+import { profileFormState, StandardMemberFields, GroupMemberFields } from '../components/MemberProfileFields';
 import Pagination from '../components/Pagination';
 import usePagination from '../hooks/usePagination';
 import { useT } from '../i18n';
@@ -43,6 +44,28 @@ const Users = () => {
     type: 'REQUESTOR_GROUP_USER',
   });
   const [submitting, setSubmitting] = useState(false);
+
+  const [memberProfile, setMemberProfile] = useState(null);
+  const [memberStandard, setMemberStandard] = useState({});
+  const [memberCustom, setMemberCustom] = useState({});
+  const [memberProfileError, setMemberProfileError] = useState(false);
+
+  /** Load a member's profile fields into the edit form. */
+  const loadMemberProfile = async (userId) => {
+    setMemberProfile(null);
+    setMemberProfileError(false);
+    try {
+      const res = await usersApi.getProfile(userId);
+      const data = res.data.data;
+      const state = profileFormState(data);
+      setMemberProfile(data);
+      setMemberStandard(state.standard);
+      setMemberCustom(state.custom);
+    } catch (err) {
+      console.error('Failed to load member profile:', err);
+      setMemberProfileError(true);
+    }
+  };
 
   // Map backend UserType enum values to display names with hierarchy level
   const allUserTypeOptions = [
@@ -148,6 +171,7 @@ const Users = () => {
         requestorGroupNames: user.groups || [],
         type: userType,
       });
+      loadMemberProfile(user.id);
     } else {
       setEditingUser(null);
       setFormData({
@@ -166,6 +190,8 @@ const Users = () => {
     setShowModal(false);
     setEditingUser(null);
     setExistingUserData(null);
+    setMemberProfile(null);
+    setMemberProfileError(false);
     setFormData({
       email: '',
       firstName: '',
@@ -199,6 +225,10 @@ const Users = () => {
           groupNames: formData.requestorGroupNames,
           type: formData.type,
         });
+        if (memberProfile?.editable) {
+          const { first_name, last_name, email, ...profileFields } = memberStandard;
+          await usersApi.updateProfile(editingUser.id, { ...profileFields, customValues: memberCustom });
+        }
         success(t('users.success.updated'));
         handleCloseModal();
         loadData();
@@ -572,6 +602,8 @@ const Users = () => {
         show={showModal}
         onHide={handleCloseModal}
         title={editingUser ? t('users.editUser') : t('users.newUser')}
+        size={editingUser ? 'lg' : ''}
+        scrollable
         footer={
           <>
             <button
@@ -700,6 +732,45 @@ const Users = () => {
               </div>
             )}
           </div>
+
+          {editingUser && (
+            <>
+              <hr />
+              <h6 className="text-muted">{t('users.profile.title')}</h6>
+              {memberProfileError ? (
+                <p className="text-danger small">{t('users.profile.loadFailed')}</p>
+              ) : !memberProfile ? (
+                <p className="text-muted small">
+                  <span className="spinner-border spinner-border-sm me-2"></span>{t('users.profile.loading')}
+                </p>
+              ) : (
+                <>
+                  {!memberProfile.editable && (
+                    <p className="form-text mt-0">{t('users.profile.readOnly')}</p>
+                  )}
+                  <StandardMemberFields
+                    profile={memberProfile}
+                    standard={memberStandard}
+                    setStandard={setMemberStandard}
+                    disabled={!memberProfile.editable}
+                  />
+                  <h6 className="text-muted mt-2">{t('users.profile.groupFields')}</h6>
+                  <GroupMemberFields
+                    profile={memberProfile}
+                    custom={memberCustom}
+                    setCustom={setMemberCustom}
+                    disabled={!memberProfile.editable}
+                    renderSection={(group, fields) => (
+                      <div key={group.id}>
+                        <div className="small fw-semibold mb-2">{group.name}</div>
+                        {fields}
+                      </div>
+                    )}
+                  />
+                </>
+              )}
+            </>
+          )}
         </form>
       </Modal>
 
