@@ -19,9 +19,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriUtils;
 
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
@@ -576,8 +574,8 @@ public class KeycloakClientProvisioningService {
         headers.setBearerAuth(adminToken);
         try {
             ResponseEntity<List> response = restTemplate.exchange(
-                    adminUrl + "/groups?search=" + UriUtils.encodeQueryParam(groupName, StandardCharsets.UTF_8),
-                    HttpMethod.GET, new HttpEntity<>(headers), List.class);
+                    adminUrl + "/groups?search={name}",
+                    HttpMethod.GET, new HttpEntity<>(headers), List.class, groupName);
 
             if (response.getBody() == null) return null;
             for (Object item : response.getBody()) {
