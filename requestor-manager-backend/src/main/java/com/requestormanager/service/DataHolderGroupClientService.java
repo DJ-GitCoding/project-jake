@@ -1005,6 +1005,8 @@ public class DataHolderGroupClientService {
                     .collect(Collectors.toList());
         }
 
+        Map<String, Object> groupContact = asMap(template.get("groupContact"));
+
         return DataHolderGroupDto.TemplateInfo.builder()
                 .templateId((String) template.get("templateId"))
                 .name((String) template.get("name"))
@@ -1026,6 +1028,8 @@ public class DataHolderGroupClientService {
                 .dataHolderGroupCode(dataHolderGroup.getCode())
                 .dataHolderGroupName(dataHolderGroup.getName())
                 .dataHolderGroupUrl(dataHolderGroup.getBaseUrl())
+                .templateGroupId(template.get("dataHolderGroupId") instanceof Number n ? n.longValue() : null)
+                .templateGroupName(groupContact != null ? (String) groupContact.get("organization") : null)
                 .contact(asMap(template.get("contact")))
                 .build();
     }

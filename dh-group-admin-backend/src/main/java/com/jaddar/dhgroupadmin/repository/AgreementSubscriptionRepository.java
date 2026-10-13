@@ -91,13 +91,8 @@ public interface AgreementSubscriptionRepository extends JpaRepository<Agreement
     @Query("SELECT s FROM AgreementSubscription s WHERE s.template.id = :templateId AND s.status = 'ACTIVE'")
     List<AgreementSubscription> findActiveByTemplateId(@Param("templateId") Long templateId);
 
-    @Query("SELECT COUNT(s) > 0 FROM AgreementSubscription s " +
-           "WHERE s.requestorGroupId = :requestorGroupId " +
-           "AND s.dataholderId = :dataholderId " +
-           "AND s.status IN ('PENDING', 'APPROVED', 'TESTING', 'ACTIVE')")
-    boolean hasBlockingSubscription(
-            @Param("requestorGroupId") String requestorGroupId,
-            @Param("dataholderId") String dataholderId);
+    List<AgreementSubscription> findByRequestorGroupIdAndStatusIn(
+            String requestorGroupId, Collection<SubscriptionStatus> statuses);
 
     long countByStatus(SubscriptionStatus status);
 

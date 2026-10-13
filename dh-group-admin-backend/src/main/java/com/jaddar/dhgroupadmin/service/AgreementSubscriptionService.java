@@ -20,6 +20,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -65,11 +66,9 @@ public class AgreementSubscriptionService {
             throw new IllegalArgumentException("Template has no active request types configured");
         }
 
-        // Check blocking subscription for same group + dataholder
-        if (subscriptionRepository.hasBlockingSubscription(
-                subscription.getRequestorGroupId(), subscription.getDataholderId())) {
+        if (hasBlockingSubscription(subscription)) {
             throw new IllegalStateException(
-                    "This requestor group already has a pending/active subscription for this data holder");
+                    "This requestor group already has a pending/active subscription with this data holder group");
         }
 
         subscription.setStatus(SubscriptionStatus.PENDING);
@@ -86,6 +85,14 @@ public class AgreementSubscriptionService {
                 subscription.getDataholderId());
 
         return subscription;
+    }
+
+    // A requestor group may hold one live subscription per data holder group, even when one app hosts several groups.
+    private boolean hasBlockingSubscription(AgreementSubscription subscription) {
+        return subscriptionRepository
+                .findByRequestorGroupIdAndStatusIn(subscription.getRequestorGroupId(), BLOCKING_STATUSES).stream()
+                .anyMatch(s -> Objects.equals(s.getRequestorGroupCode(), subscription.getRequestorGroupCode())
+                        && Objects.equals(s.getDataHolderGroupId(), subscription.getDataHolderGroupId()));
     }
 
     // ==================== Status Query ====================

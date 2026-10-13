@@ -241,6 +241,12 @@ public class DataHolderGroupDto {
         @Schema(description = "Data holder group URL")
         private String dataHolderGroupUrl;
 
+        @Schema(description = "ID of the group, within the group admin application, that owns this template")
+        private Long templateGroupId;
+
+        @Schema(description = "Name of the group, within the group admin application, that owns this template")
+        private String templateGroupName;
+
         @Schema(description = "Who to contact at the data holder group about this agreement, "
                 + "as published with the template")
         private java.util.Map<String, Object> contact;

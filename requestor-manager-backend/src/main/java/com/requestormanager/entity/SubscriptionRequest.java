@@ -101,6 +101,13 @@ public class SubscriptionRequest {
     @Column(name = "template_name")
     private String templateName;
 
+    /**
+     * The group, within the group admin application, that owns the template. One application
+     * can host several data holder groups, and a requestor group may subscribe to each of them.
+     */
+    @Column(name = "template_group_id")
+    private Long templateGroupId;
+
     // ==================== Requestor Contact Information ====================
 
     /**

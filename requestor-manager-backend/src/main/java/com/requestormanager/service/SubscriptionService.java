@@ -82,7 +82,15 @@ public class SubscriptionService {
             throw new BadRequestException("Data holder is not currently active");
         }
 
-        // Check for existing pending/active subscription with this data holder
+        DataHolderGroupDto.TemplateInfo template = dataHolderGroupClientService
+                .getTemplate(dataHolderGroup.getId(), request.getTemplateId())
+                .orElseThrow(() -> new BadRequestException("Could not load this agreement from "
+                        + dataHolderGroup.getName() + ". Please try again later."));
+        Long templateGroupId = template.getTemplateGroupId();
+        String groupName = template.getTemplateGroupName() != null
+                ? template.getTemplateGroupName() : dataHolderGroup.getName();
+
+        // Check for existing pending/active subscription with the data holder group that owns this template
         List<SubscriptionStatus> blockingStatuses = Arrays.asList(
                 SubscriptionStatus.DRAFT,
                 SubscriptionStatus.SUBMITTED,
@@ -97,15 +105,16 @@ public class SubscriptionService {
 
         Optional<SubscriptionRequest> blockingRequest = existingForDataHolderGroup.stream()
                 .filter(s -> blockingStatuses.contains(s.getStatus()))
+                .filter(s -> Objects.equals(templateGroupIdOf(s), templateGroupId))
                 .findFirst();
 
         if (blockingRequest.isPresent()) {
             SubscriptionRequest existing = blockingRequest.get();
             throw new BadRequestException(
                     "Your requestor group already has a " + existing.getStatus().name().toLowerCase().replace('_', ' ')
-                    + " subscription with " + dataHolderGroup.getName()
+                    + " subscription with " + groupName
                     + " (template: " + (existing.getTemplateName() != null ? existing.getTemplateName() : existing.getTemplateId()) + "). "
-                    + "Only one subscription per data holder is allowed. "
+                    + "Only one subscription per data holder group is allowed. "
                     + "Please cancel or wait for the existing request to complete before creating a new one.");
         }
 
@@ -115,6 +124,7 @@ public class SubscriptionService {
                 .dataHolderGroup(dataHolderGroup)
                 .templateId(request.getTemplateId())
                 .templateName(request.getTemplateName())
+                .templateGroupId(templateGroupId)
                 .subscriptionFieldValues(request.getSubscriptionFieldValues())
                 .acceptedLegalSectionIds(request.getAcceptedLegalSectionIds())
                 .userFieldMapping(cleanUserFieldMapping(request.getUserFieldMapping(), requestorGroup.getId()))
@@ -1185,6 +1195,16 @@ public class SubscriptionService {
             log.info("Subscription {} template-change state is now {}",
                     sr.getInternalRequestId(), sr.getPendingChangeStatus());
         }
+    }
+
+    // The owning group of an existing request's template, looked up and kept for requests made before it was recorded.
+    private Long templateGroupIdOf(SubscriptionRequest existing) {
+        if (existing.getTemplateGroupId() == null) {
+            dataHolderGroupClientService.getTemplate(existing.getDataHolderGroup().getId(), existing.getTemplateId())
+                    .map(DataHolderGroupDto.TemplateInfo::getTemplateGroupId)
+                    .ifPresent(existing::setTemplateGroupId);
+        }
+        return existing.getTemplateGroupId();
     }
 
     private DataHolderGroupDto.InitiationRequest buildInitiationRequest(SubscriptionRequest subscriptionRequest) {
